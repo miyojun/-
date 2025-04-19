@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>ピープルアナライザー</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f0f0;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+    }
+    #game-container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: #fff;
+      border: 1px solid #ccc;
+      padding: 20px;
+    }
+    .person-list, .team {
+      display: flex;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+    .person {
+      border: 1px solid #333;
+      margin: 5px;
+      padding: 10px;
+      cursor: pointer;
+      width: 150px;
+      text-align: center;
+      background: #e0e0ff;
+    }
+    .slot {
+      border: 2px dashed #aaa;
+      margin: 5px;
+      padding: 20px;
+      width: 150px;
+      text-align: center;
+      background: #f9f9f9;
+    }
+    #analyze-btn {
+      display: block;
+      margin: 0 auto;
+      padding: 10px 20px;
+      font-size: 16px;
+    }
+    #result {
+      text-align: center;
+      font-size: 18px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>ピープルアナライザー</h1>
+  <div id="game-container">
+    <h2>利用可能なメンバー</h2>
+    <div class="person-list" id="personList">
+      <!-- メンバーリストがここに表示されます -->
+    </div>
+    <h2>チーム編成</h2>
+    <div class="team">
+      <div class="slot" data-slot="0">スロット1</div>
+      <div class="slot" data-slot="1">スロット2</div>
+      <div class="slot" data-slot="2">スロット3</div>
+    </div>
+    <button id="analyze-btn">チーム生産性を分析</button>
+    <div id="result"></div>
+  </div>
+
+  <script>
+    // メンバーのデータ（例）
+    const people = [
+      { id: 1, name: '山田 太郎', personality: '外向的', skill: 80 },
+      { id: 2, name: '佐藤 花子', personality: '内向的', skill: 70 },
+      { id: 3, name: '鈴木 次郎', personality: '分析的', skill: 85 },
+      { id: 4, name: '高橋 三郎', personality: '協調的', skill: 75 },
+      { id: 5, name: '伊藤 四郎', personality: '革新的', skill: 90 },
+    ];
+
+    // チームのスロット（初期は空）
+    const team = [null, null, null];
+
+    const personListEl = document.getElementById('personList');
+    const slots = document.querySelectorAll('.slot');
+    const resultEl = document.getElementById('result');
+
+    // 利用可能なメンバーを画面に表示
+    function displayPeople() {
+      personListEl.innerHTML = '';
+      people.forEach(person => {
+        const personDiv = document.createElement('div');
+        personDiv.className = 'person';
+        personDiv.innerHTML = `
+          <strong>${person.name}</strong><br>
+          性格: ${person.personality}<br>
+          スキル: ${person.skill}
+        `;
+        personDiv.addEventListener('click', () => {
+          // 空いているスロットに自動配置
+          const emptyIndex = team.indexOf(null);
+          if (emptyIndex !== -1) {
+            team[emptyIndex] = person;
+            updateSlots();
+          } else {
+            alert('全てのスロットが埋まっています！');
+          }
+        });
+        personListEl.appendChild(personDiv);
+      });
+    }
+
+    // チームスロットの表示を更新
+    function updateSlots() {
+      slots.forEach((slot, index) => {
+        if (team[index]) {
+          slot.innerHTML = `
+            <strong>${team[index].name}</strong><br>
+            性格: ${team[index].personality}<br>
+            スキル: ${team[index].skill}<br>
+            <button onclick="removeFromTeam(${index})">削除</button>
+          `;
+        } else {
+          slot.innerHTML = 'スロット' + (index + 1);
+        }
+      });
+    }
+
+    // 指定したスロットからメンバーを削除
+    function removeFromTeam(index) {
+      team[index] = null;
+      updateSlots();
+    }
+
+    // チーム生産性の計算（シンプルな例）
+    function calculateProductivity() {
+      let productivity = 0;
+      team.forEach(member => {
+        if (member) {
+          productivity += member.skill;
+        }
+      });
+      // 性格の組み合わせによるボーナス（例: 分析的と革新的の組み合わせ）
+      const personalities = team.filter(m => m).map(m => m.personality);
+      if (personalities.includes('分析的') && personalities.includes('革新的')) {
+        productivity += 20;
+      }
+      return productivity;
+    }
+
+    // 分析ボタンのクリックイベント
+    document.getElementById('analyze-btn').addEventListener('click', () => {
+      const score = calculateProductivity();
+      resultEl.textContent = 'チーム生産性スコア: ' + score;
+    });
+
+    // 初期表示
+    displayPeople();
+
+    // グローバル関数として定義（スロット内の削除ボタン用）
+    window.removeFromTeam = removeFromTeam;
+  </script>
+</body>
+</html>

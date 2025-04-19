@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>サラリーマン・グラディウス (v3 - 画像反映)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.35/Tone.min.js"></script>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #222;
+            margin: 0;
+            font-family: 'Press Start 2P', cursive;
+            color: #fff;
+            flex-direction: column; /* 縦方向に要素を並べる */
+        }
+        #gameContainer {
+            position: relative; /* 相対位置指定 */
+            width: 800px; /* ゲーム画面の幅 */
+            height: 600px; /* ゲーム画面の高さ */
+            border: 3px solid #fff;
+            background-color: #000;
+            overflow: hidden; /* はみ出した要素を隠す */
+            margin-bottom: 10px; /* キャンバスとパワーアップバーの間隔 */
+        }
+        canvas {
+            display: block;
+            background-color: #111; /* 背景色を少し明るく */
+            image-rendering: pixelated; /* ドット絵感を出す */
+        }
+        #powerUpBar {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #333;
+            padding: 5px;
+            border: 2px solid #fff;
+            border-radius: 5px;
+            width: 796px; /* コンテナ幅に合わせる */
+            box-sizing: border-box; /* paddingとborderを幅に含める */
+        }
+        .powerUpItem {
+            padding: 5px 10px;
+            margin: 0 5px;
+            border: 1px solid #555;
+            color: #888;
+            font-size: 12px;
+            cursor: default; /* 通常のカーソル */
+            transition: all 0.2s ease;
+            text-align: center; /* 中央揃えを追加 */
+            min-width: 60px; /* 最低幅を確保 */
+        }
+        .powerUpItem.highlighted {
+            background-color: #ffcc00;
+            color: #000;
+            border-color: #fff;
+            box-shadow: 0 0 10px #ffcc00;
+        }
+        .powerUpItem.active {
+            background-color: #ff6600; /* アクティブなパワーアップの色 */
+            color: #fff;
+            border-color: #fff;
+        }
+        #uiLayer {
+            position: absolute; /* 絶対位置指定 */
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 16px;
+            pointer-events: none; /* UI要素がクリックイベントを妨げないように */
+            text-shadow: 1px 1px 2px #000;
+        }
+        #messageBox {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 30px;
+            border: 2px solid white;
+            border-radius: 10px;
+            font-size: 24px;
+            text-align: center;
+            display: none; /* 初期状態では非表示 */
+            z-index: 10;
+        }
+         #messageBox button {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 16px;
+            padding: 10px 20px;
+            margin-top: 20px;
+            cursor: pointer;
+            background-color: #ffcc00;
+            border: 2px solid #fff;
+            color: #000;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        #messageBox button:hover {
+            background-color: #ffa500;
+        }
+        /* 背景の星 (CSSでの実装は削除し、Canvasで描画) */
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <div id="uiLayer">
+            <div id="score">SCORE: 0</div>
+            <div id="lives">LIVES: 💖💖💖</div>
+        </div>
+         <div id="messageBox">
+            <div id="messageText"></div>
+            <button id="restartButton">RESTART</button>
+        </div>
+    </div>
+    <div id="powerUpBar">
+        <div class="powerUpItem" id="speed">SPEED UP</div>
+        <div class="powerUpItem" id="missile">MISSILE</div>
+        <div class="powerUpItem" id="double">DOUBLE</div>
+        <div class="powerUpItem" id="laser">LASER</div>
+        <div class="powerUpItem" id="option">OPTION</div>
+        <div class="powerUpItem" id="shield">? (SHIELD)</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const gameContainer = document.getElementById('gameContainer');
+        const powerUpBar = document.getElementById('powerUpBar');
+        const powerUpItems = powerUpBar.querySelectorAll('.powerUpItem');
+        const scoreDisplay = document.getElementById('score');
+        const livesDisplay = document.getElementById('lives');
+        const messageBox = document.getElementById('messageBox');
+        const messageText = document.getElementById('messageText');
+        const restartButton = document.getElementById('restartButton');
+
+        let gameWidth, gameHeight;
+        let stars = [];
+
+        // --- 画像読み込み ---
+        const playerImage = new Image();
+        playerImage.src = 'refleko_right.png'; // HTMLファイルと同じフォルダにあると仮定
+        let playerImageLoaded = false;
+        playerImage.onload = () => {
+            playerImageLoaded = true;
+            console.log("プレイヤー画像を読み込みました。");
+        };
+        playerImage.onerror = () => {
+            console.error("プレイヤー画像の読み込みに失敗しました。矩形を描画します。");
+            // playerImageLoaded は false のまま
+        };
+
+
+        // --- 音声設定 ---
+        const synth = new Tone.Synth().toDestination();
+        const metalSynth = new Tone.MetalSynth({ frequency: 150, envelope: { attack: 0.001, decay: 0.1, release: 0.01 }, harmonicity: 3.1, modulationIndex: 16, resonance: 4000, octaves: 0.5 }).toDestination();
+        const noiseSynth = new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.1 } }).toDestination();
+
+        function playSound(type) {
+            if (!Tone.context.state || Tone.context.state !== 'running') {
+                 console.log("AudioContext is not running. Trying to resume...");
+                 Tone.start().catch(e => console.error("Tone.start failed:", e));
+            }
+            try {
+                // playSoundの内容は変更なし...
+                switch (type) {
+                    case 'shoot': synth.triggerAttackRelease("C5", "16n"); break;
+                    case 'enemyHit': noiseSynth.triggerAttackRelease("8n"); break;
+                    case 'playerHit': metalSynth.triggerAttackRelease("16n"); break;
+                    case 'powerupCollect': synth.triggerAttackRelease("E5", "8n"); break;
+                    case 'powerupActivate': synth.triggerAttackRelease("G5", "8n"); break;
+                    case 'gameOver':
+                         synth.triggerAttackRelease("C3", "4n", Tone.now());
+                         synth.triggerAttackRelease("G2", "4n", Tone.now() + 0.2);
+                         synth.triggerAttackRelease("E2", "4n", Tone.now() + 0.4);
+                         synth.triggerAttackRelease("C2", "2n", Tone.now() + 0.6);
+                         break;
+                     case 'missile':
+                        const missileNoise = new Tone.NoiseSynth({ noise: { type: 'pink' }, envelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.1 } }).toDestination();
+                        missileNoise.triggerAttackRelease("8n");
+                        break;
+                    case 'laser': synth.triggerAttackRelease("C6", "32n"); break;
+                }
+            } catch (error) {
+                console.error("Error playing sound:", error);
+            }
+        }
+
+        // --- ゲーム設定 ---
+        const PLAYER_WIDTH = 40; // 当たり判定と描画サイズは維持
+        const PLAYER_HEIGHT = 20;
+        const PLAYER_SPEED_BASE = 3;
+        const PROJECTILE_SPEED = 7;
+        const ENEMY_SPEED_BASE = 2;
+        const ENEMY_SPAWN_RATE = 900;
+        const POWERUP_ITEM_SPEED = 1.5;
+        const POWERUP_ITEM_WIDTH = 12;
+        const POWERUP_ITEM_HEIGHT = 20;
+        const MISSILE_SPEED = 4;
+        const OPTION_DISTANCE = 40;
+        const STAR_COUNT = 100;
+        const STAR_SPEED_FACTOR = 0.5;
+
+        // --- ゲーム状態 ---
+        let player;
+        let projectiles = [];
+        let missiles = [];
+        let enemies = [];
+        let powerUpItemsList = [];
+        let options = [];
+        let score = 0;
+        let lives = 3;
+        let gameOver = false;
+        let gameRunning = false;
+        let lastEnemySpawn = 0;
+        let keys = {};
+        let currentPowerUpIndex = -1;
+        let activePowerUps = { speed: 0, missile: false, double: false, laser: false, option: 0, shield: false };
+        let shieldHp = 0;
+        let laserActive = false;
+
+        const powerUpTypes = ['speed', 'missile', 'double', 'laser', 'option', 'shield'];
+        const enemyTypes = {
+            report: { width: 30, height: 40, color: '#cccccc', health: 1, speedMultiplier: 1, value: 100, moveType: 'straight', dropChance: 0.15, drawDetail: drawReportDetail },
+            spreadsheet: { width: 40, height: 30, color: '#aaffaa', health: 2, speedMultiplier: 0.8, value: 150, moveType: 'straight', dropChance: 0.25, drawDetail: drawSheetDetail },
+            memo: { width: 20, height: 20, color: '#ffff99', health: 1, speedMultiplier: 1.5, value: 120, moveType: 'sine', dropChance: 0.1, drawDetail: drawMemoDetail },
+            urgent: { width: 35, height: 25, color: '#ffaaaa', health: 1, speedMultiplier: 2.0, value: 200, moveType: 'straight', dropChance: 0.3, drawDetail: drawUrgentDetail }
+        };
+
+        // --- プレイヤーオブジェクトクラス (drawメソッドを更新) ---
+        class Player {
+             constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.width = PLAYER_WIDTH; // 当たり判定用のサイズ
+                this.height = PLAYER_HEIGHT;
+                this.speed = PLAYER_SPEED_BASE;
+                this.shootCooldown = 0;
+                this.missileCooldown = 0;
+                this.laserDuration = 0;
+                // this.color は画像を使うので不要に
+                this.invincible = false;
+                this.invincibleTimer = 0;
+            }
+
+            draw(ctx) {
+                // 無敵時間の点滅表現
+                let drawPlayer = true;
+                if (this.invincible) {
+                    // タイマーに基づいて点滅させる (偶数フレームで描画)
+                    drawPlayer = Math.floor(this.invincibleTimer / 100) % 2 === 0;
+                }
+
+                if (drawPlayer) {
+                    if (playerImageLoaded) {
+                        // 画像が読み込まれていれば画像を描画
+                        ctx.drawImage(playerImage, this.x, this.y, this.width, this.height);
+                    } else {
+                        // 画像読み込み失敗時のフォールバック（元の矩形描画）
+                        ctx.fillStyle = '#00ff00'; // 緑色
+                        ctx.fillRect(this.x, this.y, this.width, this.height);
+                        ctx.fillStyle = '#ffffff'; // Yシャツ
+                        ctx.fillRect(this.x + 5, this.y + 5, this.width - 10, this.height - 10);
+                        ctx.fillStyle = '#000000'; // ネクタイ
+                        ctx.fillRect(this.x + this.width / 2 - 2 , this.y + 5, 4, this.height - 10);
+                    }
+                }
+
+                // シールド描画 (プレイヤー描画とは独立)
+                if (activePowerUps.shield && shieldHp > 0) {
+                    ctx.save(); // 現在の描画状態を保存
+                    ctx.globalAlpha = 0.5 + shieldHp * 0.25; // シールドの透明度
+                    ctx.strokeStyle = `rgba(0, 150, 255, 1)`; // 色は固定、透明度はglobalAlphaで
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(this.x + this.width / 2, this.y + this.height / 2, this.width / 1.5, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.restore(); // 描画状態を元に戻す (globalAlphaなど)
+                    ctx.lineWidth = 1; // 他の描画のために太さを戻す
+                }
+            }
+
+
+            update() {
+                 // 更新ロジック (無敵時間の処理を調整)
+                if (this.invincible) {
+                    this.invincibleTimer -= 1000/60;
+                    if (this.invincibleTimer <= 0) {
+                        this.invincible = false;
+                    }
+                    // 点滅は draw 側で行うので色変更は不要
+                }
+
+                // 移動 (変更なし)
+                if (keys['ArrowUp'] || keys['w']) this.y -= this.speed;
+                if (keys['ArrowDown'] || keys['s']) this.y += this.speed;
+                if (keys['ArrowLeft'] || keys['a']) this.x -= this.speed;
+                if (keys['ArrowRight'] || keys['d']) this.x += this.speed;
+
+                this.x = Math.max(0, Math.min(this.x, gameWidth - this.width));
+                this.y = Math.max(0, Math.min(this.y, gameHeight - this.height));
+
+                // クールダウン (変更なし)
+                if (this.shootCooldown > 0) this.shootCooldown -= 16.67;
+                if (this.missileCooldown > 0) this.missileCooldown -= 16.67;
+                if (this.laserDuration > 0) this.laserDuration -= 16.67;
+                else laserActive = false;
+
+                // 自動射撃 (変更なし)
+                if ((keys[' '] || keys['z']) && this.shootCooldown <= 0) {
+                    this.shoot();
+                }
+
+                 // ミサイル発射 (変更なし)
+                 if (activePowerUps.missile && this.missileCooldown <= 0) {
+                     this.fireMissile();
+                     this.missileCooldown = 800;
+                 }
+
+                 // オプション位置更新 (変更なし)
+                 options.forEach((option, index) => {
+                     option.update(this.x, this.y, index);
+                 });
+            }
+
+             // shoot, fireMissile, activatePowerUp, hit, setInvincible は変更なし
+             shoot() {
+                 if (gameOver) return;
+                 this.shootCooldown = activePowerUps.laser ? 50 : 200;
+                 const projectileY = this.y + this.height / 2 - 2.5;
+
+                 if (activePowerUps.laser) {
+                     laserActive = true;
+                     this.laserDuration = 150;
+                     playSound('laser');
+                 } else {
+                     projectiles.push(new Projectile(this.x + this.width, projectileY, 'player'));
+                     playSound('shoot');
+                     if (activePowerUps.double) {
+                         projectiles.push(new Projectile(this.x + this.width, projectileY, 'player', Math.PI / 12));
+                         projectiles.push(new Projectile(this.x + this.width, projectileY, 'player', -Math.PI / 12));
+                     }
+                 }
+                 options.forEach(option => option.shoot(activePowerUps.laser));
+             }
+            fireMissile() {
+                 if (gameOver) return;
+                 missiles.push(new Missile(this.x + this.width / 2, this.y + this.height, 'down'));
+                 missiles.push(new Missile(this.x + this.width / 2, this.y, 'up'));
+                 playSound('missile');
+            }
+             activatePowerUp() {
+                 if (currentPowerUpIndex !== -1) {
+                    const selectedPowerUp = powerUpTypes[currentPowerUpIndex];
+                    playSound('powerupActivate');
+                    switch (selectedPowerUp) {
+                        case 'speed':
+                            activePowerUps.speed++;
+                            this.speed = PLAYER_SPEED_BASE + activePowerUps.speed * 1;
+                            break;
+                        case 'missile': activePowerUps.missile = true; break;
+                        case 'double':
+                            activePowerUps.double = true;
+                            activePowerUps.laser = false;
+                            break;
+                        case 'laser':
+                             activePowerUps.laser = true;
+                             activePowerUps.double = false;
+                            break;
+                        case 'option':
+                            if (activePowerUps.option < 2) {
+                                activePowerUps.option++;
+                                options.push(new Option());
+                            }
+                            break;
+                        case 'shield':
+                            activePowerUps.shield = true;
+                            shieldHp = 2;
+                            break;
+                    }
+                    updatePowerUpUI();
+                    currentPowerUpIndex = -1;
+                    highlightPowerUp();
+                }
+            }
+            hit() {
+                 if (this.invincible) return;
+                 playSound('playerHit');
+                 if (activePowerUps.shield && shieldHp > 0) {
+                     shieldHp--;
+                     this.setInvincible(500);
+                     if (shieldHp <= 0) {
+                         activePowerUps.shield = false;
+                         const shieldElement = document.getElementById('shield');
+                         if (shieldElement) shieldElement.classList.remove('active');
+                     }
+                     return;
+                 }
+                lives--;
+                updateLivesDisplay();
+                resetPowerUps();
+                if (lives <= 0) {
+                    gameOver = true;
+                    playSound('gameOver');
+                    showGameOverMessage();
+                } else {
+                    this.x = 50;
+                    this.y = gameHeight / 2 - PLAYER_HEIGHT / 2;
+                    this.setInvincible(2000);
+                }
+            }
+            setInvincible(duration) {
+                this.invincible = true;
+                this.invincibleTimer = duration;
+            }
+        }
+
+        // --- 他のクラス (Projectile, Missile, Enemy, PowerUpItem, Option, Star) は変更なし ---
+        class Projectile { /* ...変更なし... */
+             constructor(x, y, type, angle = 0) { this.x = x; this.y = y; this.width = 10; this.height = 5; this.speed = PROJECTILE_SPEED; this.type = type; this.angle = angle; this.vx = Math.cos(angle) * this.speed; this.vy = Math.sin(angle) * this.speed; }
+            draw(ctx) { ctx.fillStyle = this.type === 'player' ? '#ffff00' : '#ff0000'; ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.angle); ctx.fillRect(-this.width / 2, -this.height / 2, this.width, this.height); ctx.restore(); }
+            update() { this.x += this.vx; this.y += this.vy; }
+        }
+        class Missile { /* ...変更なし... */
+            constructor(x, y, direction) { this.x = x; this.y = y; this.width = 8; this.height = 15; this.speed = MISSILE_SPEED; this.direction = direction; this.color = '#00ffff'; }
+            draw(ctx) { ctx.fillStyle = this.color; ctx.beginPath(); if (this.direction === 'down') { ctx.moveTo(this.x - this.width / 2, this.y); ctx.lineTo(this.x + this.width / 2, this.y); ctx.lineTo(this.x, this.y + this.height); } else { ctx.moveTo(this.x - this.width / 2, this.y); ctx.lineTo(this.x + this.width / 2, this.y); ctx.lineTo(this.x, this.y - this.height); } ctx.closePath(); ctx.fill(); }
+            update() { if (this.direction === 'down') { this.y += this.speed; if (this.y > gameHeight - this.height - 5) { this.y = gameHeight - this.height - 5; this.x += this.speed / 2; this.direction = 'ground'; } } else { this.y -= this.speed; if (this.y < this.height + 5) { this.y = this.height + 5; this.x += this.speed / 2; this.direction = 'ceiling'; } } if (this.direction === 'ground' || this.direction === 'ceiling') { this.x += this.speed / 1.5; } }
+        }
+        class Enemy { /* ...変更なし... */
+             constructor(y, typeName) { const type = enemyTypes[typeName] || enemyTypes.report; this.typeName = typeName; this.width = type.width; this.height = type.height; this.x = gameWidth; this.y = y; this.speed = (ENEMY_SPEED_BASE + Math.random() * 0.5) * type.speedMultiplier; this.color = type.color; this.health = type.health; this.value = type.value; this.moveType = type.moveType; this.amplitude = Math.random() * 40 + 10; this.frequency = Math.random() * 0.04 + 0.01; this.initialY = y; this.canDropPowerUp = Math.random() < type.dropChance; this.drawDetail = type.drawDetail; }
+            draw(ctx) { ctx.fillStyle = this.color; ctx.fillRect(this.x, this.y, this.width, this.height); ctx.strokeStyle = '#555'; ctx.lineWidth = 1; ctx.strokeRect(this.x, this.y, this.width, this.height); this.drawDetail(ctx, this.x, this.y, this.width, this.height); }
+            update() { this.x -= this.speed; if (this.moveType === 'sine') { this.y = this.initialY + Math.sin((gameWidth - this.x) * this.frequency) * this.amplitude; this.y = Math.max(0, Math.min(this.y, gameHeight - this.height)); } }
+            hit() { this.health--; if (this.health <= 0) { addScore(this.value); playSound('enemyHit'); if (this.canDropPowerUp) { dropPowerUpItem(this.x + this.width / 2, this.y + this.height / 2); } return true; } this.color = '#ff0000'; setTimeout(() => { this.color = enemyTypes[this.typeName]?.color || enemyTypes.report.color; }, 50); return false; }
+        }
+        function drawReportDetail(ctx, x, y, w, h) { ctx.strokeStyle = '#555'; ctx.lineWidth = 1; ctx.beginPath(); for (let i = 5; i < h - 5; i += 8) { ctx.moveTo(x + 5, y + i); ctx.lineTo(x + w - 5, y + i); } ctx.stroke(); }
+        function drawSheetDetail(ctx, x, y, w, h) { ctx.strokeStyle = '#77cc77'; ctx.lineWidth = 0.5; ctx.beginPath(); for (let i = 5; i < w; i += 10) { ctx.moveTo(x + i, y); ctx.lineTo(x + i, y + h); } for (let i = 5; i < h; i += 10) { ctx.moveTo(x, y + i); ctx.lineTo(x + w, y + i); } ctx.stroke(); }
+        function drawMemoDetail(ctx, x, y, w, h) { ctx.fillStyle = 'rgba(0,0,0,0.1)'; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 5, y); ctx.lineTo(x, y + 5); ctx.closePath(); ctx.fill(); }
+        function drawUrgentDetail(ctx, x, y, w, h) { drawReportDetail(ctx, x, y, w, h); ctx.fillStyle = '#ff0000'; ctx.font = 'bold 12px "Press Start 2P"'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.save(); ctx.translate(x + w / 2, y + h / 2); ctx.rotate(-Math.PI / 12); ctx.fillText("!", 0, 0); ctx.restore(); }
+        class PowerUpItem { /* ...変更なし... */
+            constructor(x, y) { this.x = x - POWERUP_ITEM_WIDTH / 2; this.y = y - POWERUP_ITEM_HEIGHT / 2; this.width = POWERUP_ITEM_WIDTH; this.height = POWERUP_ITEM_HEIGHT; this.speed = POWERUP_ITEM_SPEED; this.colorTop = '#aaaaee'; this.colorBody = '#4444ff'; this.colorAccent = '#ff4444'; }
+            draw(ctx) { const tH = this.height * 0.2, bH = this.height * 0.6, btH = this.height * 0.2; ctx.fillStyle = this.colorTop; ctx.fillRect(this.x, this.y, this.width, tH); ctx.fillStyle = this.colorBody; ctx.fillRect(this.x, this.y + tH, this.width, bH); ctx.fillStyle = this.colorTop; ctx.fillRect(this.x, this.y + tH + bH, this.width, btH); ctx.fillStyle = this.colorAccent; ctx.beginPath(); ctx.moveTo(this.x + this.width / 2, this.y + tH + bH * 0.2); ctx.lineTo(this.x + this.width * 0.8, this.y + this.height / 2); ctx.lineTo(this.x + this.width / 2, this.y + tH + bH * 0.8); ctx.lineTo(this.x + this.width * 0.2, this.y + this.height / 2); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#ffffff'; ctx.font = 'bold 8px "Press Start 2P"'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText("RB", this.x + this.width / 2, this.y + this.height / 2 + 1); }
+            update() { this.x -= this.speed; }
+        }
+        class Option { /* ...変更なし... */
+            constructor() { this.x = 0; this.y = 0; this.size = 15; this.color = '#00aaff'; this.followDelay = 10; this.history = []; this.shootCooldown = 0; }
+            draw(ctx) { ctx.fillStyle = this.color; ctx.beginPath(); ctx.arc(this.x + this.size / 2, this.y + this.size / 2, this.size / 2, 0, Math.PI * 2); ctx.fill(); }
+            update(playerX, playerY, index) { this.history.push({ x: playerX, y: playerY }); if (this.history.length > this.followDelay * (index + 1)) { this.history.shift(); } if (this.history.length > 0) { const targetPos = this.history[0]; this.x = targetPos.x; this.y = targetPos.y; } else { this.x = playerX - OPTION_DISTANCE * (index + 1); this.y = playerY; } this.x = Math.max(0, Math.min(this.x, gameWidth - this.size)); this.y = Math.max(0, Math.min(this.y, gameHeight - this.size)); if (this.shootCooldown > 0) this.shootCooldown -= 16.67; }
+            shoot(isLaser) { if (this.shootCooldown <= 0) { this.shootCooldown = 200; const pY = this.y + this.size / 2 - 2.5; if (isLaser) { projectiles.push(new Projectile(this.x + this.size, pY, 'player')); playSound('laser'); } else { projectiles.push(new Projectile(this.x + this.size, pY, 'player')); playSound('shoot'); } } }
+        }
+        class Star { /* ...変更なし... */
+            constructor() { this.x = Math.random() * gameWidth; this.y = Math.random() * gameHeight; this.size = Math.random() * 1.5 + 0.5; this.speed = this.size * STAR_SPEED_FACTOR; }
+            draw(ctx) { ctx.fillStyle = `rgba(255, 255, 255, ${this.size / 2})`; ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill(); }
+            update() { this.x -= this.speed; if (this.x < 0) { this.x = gameWidth; this.y = Math.random() * gameHeight; this.size = Math.random() * 1.5 + 0.5; this.speed = this.size * STAR_SPEED_FACTOR; } }
+        }
+
+        // --- 初期化 ---
+        function init() {
+            resizeCanvas();
+            // player の初期化は画像読み込み状態に関わらず行う
+            player = new Player(50, gameHeight / 2 - PLAYER_HEIGHT / 2);
+            projectiles = []; missiles = []; enemies = []; powerUpItemsList = []; options = [];
+            score = 0; lives = 3; gameOver = false; gameRunning = false; lastEnemySpawn = 0;
+            keys = {}; currentPowerUpIndex = -1; resetPowerUps(false); shieldHp = 0; laserActive = false;
+            updateScoreDisplay(); updateLivesDisplay(); updatePowerUpUI(); highlightPowerUp();
+            messageBox.style.display = 'none';
+
+            stars = [];
+            for (let i = 0; i < STAR_COUNT; i++) { stars.push(new Star()); }
+
+            showStartMessage();
+
+            const newRestartButton = restartButton.cloneNode(true);
+            restartButton.parentNode.replaceChild(newRestartButton, restartButton);
+            document.getElementById('restartButton').addEventListener('click', startGame);
+
+            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('keyup', handleKeyUp);
+            window.removeEventListener('resize', resizeCanvas);
+            window.addEventListener('keydown', handleKeyDown);
+            window.addEventListener('keyup', handleKeyUp);
+            window.addEventListener('resize', resizeCanvas);
+        }
+
+        // --- メッセージ表示関数 (変更なし) ---
+        function showStartMessage() { /* ...変更なし... */
+             messageText.innerHTML = "サラリーマン・グラディウス<br>Arrow Keys/WASD: Move<br>Space/Z: Shoot<br>Shift/X: Activate PowerUp<br><br>PRESS START BUTTON";
+             const startButton = document.getElementById('restartButton');
+             startButton.textContent = "START GAME";
+             messageBox.style.display = 'block';
+             gameRunning = false;
+        }
+        function showGameOverMessage() { /* ...変更なし... */
+            messageText.innerHTML = `GAME OVER<br>FINAL SCORE: ${score}`;
+            const restartBtn = document.getElementById('restartButton');
+            restartBtn.textContent = "RESTART";
+            messageBox.style.display = 'block';
+            gameRunning = false;
+        }
+
+        // --- ゲーム開始関数 (変更なし) ---
+        function startGame() { /* ...変更なし... */
+             if (Tone.context.state !== 'running') { Tone.start().catch(e => console.error("Tone.start failed:", e)); }
+             messageBox.style.display = 'none';
+             if (gameOver) { init(); }
+             gameOver = false;
+             gameRunning = true;
+             requestAnimationFrame(gameLoop);
+        }
+
+        // --- リサイズ処理 (変更なし) ---
+        function resizeCanvas() { /* ...変更なし... */
+            gameWidth = gameContainer.clientWidth; gameHeight = gameContainer.clientHeight;
+            canvas.width = gameWidth; canvas.height = gameHeight;
+            stars.forEach(star => { star.x = Math.min(star.x, gameWidth); star.y = Math.min(star.y, gameHeight); });
+            powerUpBar.style.width = `${gameWidth - 4}px`;
+        }
+
+        // --- パワーアップ処理 (変更なし) ---
+        function collectPowerUp() { /* ...変更なし... */ playSound('powerupCollect'); currentPowerUpIndex = (currentPowerUpIndex + 1) % powerUpTypes.length; highlightPowerUp(); }
+        function highlightPowerUp() { /* ...変更なし... */ powerUpItems.forEach((item, index) => { item.classList.toggle('highlighted', index === currentPowerUpIndex); }); }
+        function updatePowerUpUI() { /* ...変更なし... */ powerUpTypes.forEach((type, index) => { const element = document.getElementById(type); if (element) { let isActive = false; let text = element.textContent.split(' (')[0]; switch(type) { case 'speed': isActive = activePowerUps.speed > 0; if (isActive) text += ` (${activePowerUps.speed})`; break; case 'option': isActive = activePowerUps.option > 0; if (isActive) text += ` (${activePowerUps.option})`; break; case 'shield': isActive = activePowerUps.shield; text = isActive ? `SHIELD (${shieldHp})` : '? (SHIELD)'; break; default: isActive = activePowerUps[type]; break; } element.classList.toggle('active', isActive); element.textContent = text; } }); }
+        function resetPowerUps(updateUI = true) { /* ...変更なし... */ activePowerUps = { speed: 0, missile: false, double: false, laser: false, option: 0, shield: false }; if (player) player.speed = PLAYER_SPEED_BASE; options = []; shieldHp = 0; laserActive = false; currentPowerUpIndex = -1; if(updateUI) { updatePowerUpUI(); highlightPowerUp(); } }
+        function dropPowerUpItem(x, y) { /* ...変更なし... */ powerUpItemsList.push(new PowerUpItem(x, y)); }
+
+        // --- スコア・ライフ更新 (変更なし) ---
+        function addScore(amount) { /* ...変更なし... */ score += amount; updateScoreDisplay(); }
+        function updateScoreDisplay() { /* ...変更なし... */ scoreDisplay.textContent = `SCORE: ${score}`; }
+        function updateLivesDisplay() { /* ...変更なし... */ livesDisplay.innerHTML = `LIVES: ${'💖'.repeat(lives)}`; }
+
+        // --- 衝突判定 (変更なし) ---
+        function checkCollisions() { /* ...変更なし... */
+            // プレイヤー弾 vs 敵
+            projectiles = projectiles.filter(proj => { if (proj.type !== 'player') return true; for (let i = enemies.length - 1; i >= 0; i--) { const enemy = enemies[i]; if (isColliding(proj, enemy)) { if (enemy.hit()) { enemies.splice(i, 1); } return false; } } return proj.x < gameWidth; });
+            // プレイヤーミサイル vs 敵
+             missiles = missiles.filter(missile => { for (let i = enemies.length - 1; i >= 0; i--) { const enemy = enemies[i]; const missileHitbox = { x: missile.x - missile.width / 2, y: missile.direction === 'down' ? missile.y : missile.y - missile.height, width: missile.width, height: missile.height }; if (isColliding(missileHitbox, enemy)) { if (enemy.hit()) { enemies.splice(i, 1); } return false; } } return missile.x < gameWidth + 50 && missile.x > -missile.width && missile.y < gameHeight + 50 && missile.y > -missile.height; });
+            // プレイヤー vs 敵
+            if (!player.invincible) { enemies.forEach((enemy, index) => { if (isColliding(player, enemy)) { player.hit(); if (enemy.hit()) { enemies.splice(index, 1); } } }); }
+             // プレイヤー vs パワーアップアイテム
+             powerUpItemsList = powerUpItemsList.filter(item => { if (isColliding(player, item)) { collectPowerUp(); return false; } return item.x > -item.width; });
+             // レーザー vs 敵
+             if (laserActive) { const laserEndX = gameWidth; const laserY = player.y + player.height / 2; const laserRect = { x: player.x + player.width, y: laserY - 2, width: laserEndX - (player.x + player.width), height: 4 }; options.forEach(option => { const optionLaserY = option.y + option.size / 2; const optionLaserRect = { x: option.x + option.size, y: optionLaserY - 2, width: laserEndX - (option.x + option.size), height: 4 }; for (let i = enemies.length - 1; i >= 0; i--) { const enemy = enemies[i]; if (isColliding(optionLaserRect, enemy)) { if (enemy.hit()) { enemies.splice(i, 1); } } } }); for (let i = enemies.length - 1; i >= 0; i--) { const enemy = enemies[i]; if (isColliding(laserRect, enemy)) { if (enemy.hit()) { enemies.splice(i, 1); } } } }
+        }
+        function isColliding(rect1, rect2) { /* ...変更なし... */ return rect1.x < rect2.x + rect2.width && rect1.x + rect1.width > rect2.x && rect1.y < rect2.y + rect2.height && rect1.y + rect1.height > rect2.y; }
+
+        // --- キーボード入力 (変更なし) ---
+        function handleKeyDown(e) { /* ...変更なし... */ if (!gameRunning && messageBox.style.display === 'block') { if (e.key === 'Shift' || e.key.toLowerCase() === 'x') { e.preventDefault(); return; } if (e.key === ' ' || e.key.toLowerCase() === 'z') { e.preventDefault(); return; } } else if (gameRunning) { keys[e.key] = true; if ((e.key === 'Shift' || e.key.toLowerCase() === 'x') && !e.repeat) { player.activatePowerUp(); } if (e.key === ' ' || e.key.toLowerCase() === 'z') { keys[e.key] = true; } } if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'Shift', 'z', 'x', 'w', 'a', 's', 'd'].includes(e.key)) { e.preventDefault(); } }
+        function handleKeyUp(e) { /* ...変更なし... */ keys[e.key] = false; }
+
+        // --- ゲームループ ---
+        function gameLoop(timestamp) {
+            if (gameOver || !gameRunning) { return; }
+
+            // 敵の生成 (変更なし)
+            if (timestamp - lastEnemySpawn > ENEMY_SPAWN_RATE) {
+                lastEnemySpawn = timestamp;
+                const enemyTypeKeys = Object.keys(enemyTypes);
+                const randomTypeKey = enemyTypeKeys[Math.floor(Math.random() * enemyTypeKeys.length)];
+                const enemyType = enemyTypes[randomTypeKey];
+                const enemyY = Math.random() * (gameHeight - enemyType.height);
+                enemies.push(new Enemy(enemyY, randomTypeKey));
+            }
+
+            // 更新処理 (変更なし)
+            player.update();
+            projectiles.forEach(p => p.update());
+            missiles.forEach(m => m.update());
+            enemies.forEach(e => e.update());
+            powerUpItemsList.forEach(p => p.update());
+            stars.forEach(s => s.update());
+
+            // 衝突判定 (変更なし)
+            checkCollisions();
+
+            // 描画処理
+            ctx.clearRect(0, 0, gameWidth, gameHeight);
+            ctx.fillStyle = '#111';
+            ctx.fillRect(0, 0, gameWidth, gameHeight);
+            stars.forEach(s => s.draw(ctx));
+
+            // プレイヤー描画 (Playerクラスのdrawメソッドが画像描画に対応)
+            player.draw(ctx);
+
+            options.forEach(o => o.draw(ctx));
+            projectiles.forEach(p => p.draw(ctx));
+            missiles.forEach(m => m.draw(ctx));
+            enemies.forEach(e => e.draw(ctx));
+            powerUpItemsList.forEach(p => p.draw(ctx));
+
+            // レーザー描画 (変更なし)
+             if (laserActive) {
+                 ctx.strokeStyle = '#ff00ff'; ctx.lineWidth = 4;
+                 ctx.beginPath(); ctx.moveTo(player.x + player.width, player.y + player.height / 2);
+                 ctx.lineTo(gameWidth, player.y + player.height / 2); ctx.stroke();
+                 options.forEach(option => {
+                     ctx.beginPath(); ctx.moveTo(option.x + option.size, option.y + option.size / 2);
+                     ctx.lineTo(gameWidth, option.y + option.size / 2); ctx.stroke();
+                 });
+                 ctx.lineWidth = 1;
+             }
+
+             // パワーアップUI更新 (変更なし)
+             updatePowerUpUI();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // --- ゲーム開始 ---
+        init();
+
+    </script>
+</body>
+</html>
