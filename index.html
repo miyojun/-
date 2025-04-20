@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AIコーチ VS 学習しない組織 (v14 - 日本語化・画像表示・キー変更)</title> <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">AIコーチ リフレクこ VS 学習しない組織
+    <title>AIコーチ VS 学習しない組織 (v14 - 日本語化・画像表示・キー変更・BGM追加)</title> <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">AIコーチ リフレクこ VS 学習しない組織
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.35/Tone.min.js"></script>
     <style>
         /* 基本スタイル */
@@ -169,11 +169,12 @@
              #uiLayer, #bossHpBar {
                  font-size: clamp(8px, 2vw, 12px); /* UIフォントを小さく */
              }
-         }
+        }
 
     </style>
 </head>
 <body>
+    <audio id="bgmAudio" src="Cosmic Gladius.mp3" preload="auto" loop></audio>
     <div id="gameContainer">
         <canvas id="gameCanvas"></canvas>
         <div id="uiLayer">
@@ -210,8 +211,10 @@
         const restartButton = document.getElementById('restartButton');
         const bossHpBar = document.getElementById('bossHpBar');
         const bossHpFill = document.getElementById('bossHpFill');
-        // ★★★ スタート画像要素を取得 ★★★
         const startImage = document.getElementById('startImage');
+        // ▼▼▼ BGM Audio 要素を取得 ▼▼▼
+        const bgmAudio = document.getElementById('bgmAudio');
+        // ▲▲▲ BGM Audio 要素を取得 ▲▲▲
 
         let gameWidth, gameHeight; // キャンバスの解像度
         let stars = [];
@@ -280,9 +283,9 @@
         // --- 敵の種類定義 (変更なし) ---
         const enemyTypes = {
             shortage: { text: "人手不足", width: ENEMY_FONT_SIZE * 4, height: ENEMY_FONT_SIZE * 1.2, color: '#ffdddd', health: 2, speedMultiplier: 0.9, value: 120, moveType: 'straight', dropChance: 0.15 * 1.5 },
-            powerH:   { text: "パワハラ", width: ENEMY_FONT_SIZE * 4, height: ENEMY_FONT_SIZE * 1.2, color: '#ffaaaa', health: 1, speedMultiplier: 1.2, value: 150, moveType: 'sine', dropChance: 0.2 * 1.5 },
-            overtime: { text: "残業",   width: ENEMY_FONT_SIZE * 2, height: ENEMY_FONT_SIZE * 1.2, color: '#ddddff', health: 3, speedMultiplier: 0.7, value: 100, moveType: 'straight', dropChance: 0.1 * 1.5 },
-            sexualH:  { text: "セクハラ", width: ENEMY_FONT_SIZE * 4, height: ENEMY_FONT_SIZE * 1.2, color: '#ffccff', health: 1, speedMultiplier: 1.1, value: 140, moveType: 'sine', dropChance: 0.18 * 1.5 },
+            powerH:   { text: "パワハラ", width: ENEMY_FONT_SIZE * 4, height: ENEMY_FONT_SIZE * 1.2, color: '#ffaaaa', health: 1, speedMultiplier: 1.2, value: 150, moveType: 'sine', dropChance: 0.2 * 1.5 },
+            overtime: { text: "残業",   width: ENEMY_FONT_SIZE * 2, height: ENEMY_FONT_SIZE * 1.2, color: '#ddddff', health: 3, speedMultiplier: 0.7, value: 100, moveType: 'straight', dropChance: 0.1 * 1.5 },
+            sexualH:  { text: "セクハラ", width: ENEMY_FONT_SIZE * 4, height: ENEMY_FONT_SIZE * 1.2, color: '#ffccff', health: 1, speedMultiplier: 1.1, value: 140, moveType: 'sine', dropChance: 0.18 * 1.5 },
             turnover: { text: "高離職率", width: ENEMY_FONT_SIZE * 5, height: ENEMY_FONT_SIZE * 1.2, color: '#ffffcc', health: 2, speedMultiplier: 1.0, value: 130, moveType: 'straight', dropChance: 0.22 * 1.5 },
             nonLearningOrg: { text: "学習しない組織", width: ENEMY_FONT_SIZE * 7, height: ENEMY_FONT_SIZE * 1.2, color: '#aaaaaa', health: 5, speedMultiplier: 0.6, value: 300, moveType: 'straight', dropChance: 0.15 * 1.5 },
             resistance: { text: "抵抗勢力", width: ENEMY_FONT_SIZE * 4, height: ENEMY_FONT_SIZE * 1.2, color: '#cc5555', health: 2, speedMultiplier: 0.5, value: 180, moveType: 'shooter', dropChance: 0.2 * 1.5, shootCooldown: 2500 }
@@ -365,7 +368,17 @@
                     updatePowerUpUI(); return;
                 }
                 lives--; updateLivesDisplay(); resetPowerUps();
-                if (lives <= 0) { gameOver = true; playSound('gameOver'); showGameOverMessage(); }
+                if (lives <= 0) {
+                    gameOver = true;
+                    playSound('gameOver');
+                    // ▼▼▼ ゲームオーバー時にBGM停止 ▼▼▼
+                    if (bgmAudio) {
+                        bgmAudio.pause();
+                        bgmAudio.currentTime = 0; // 再生位置を最初に戻す
+                    }
+                    // ▲▲▲ ゲームオーバー時にBGM停止 ▲▲▲
+                    showGameOverMessage();
+                }
                 // ▼▼▼ 復活位置を gameHeight に合わせる ▼▼▼
                 else { this.x = 50; this.y = gameHeight / 2 - PLAYER_HEIGHT / 2; this.setInvincible(2000); }
                 // ▲▲▲ 復活位置を gameHeight に合わせる ▲▲▲
@@ -516,7 +529,27 @@
                 }
             }
             shoot() { if (!player || gameOver || gameWon) return; playSound('enemyShoot'); const shootX = this.x; const shootY = this.y + this.height / 2; const angleToPlayer = Math.atan2(player.y + player.height / 2 - shootY, player.x + player.width / 2 - shootX); const spreadAngle = Math.PI / 9; enemyProjectiles.push(new Projectile(shootX, shootY, 'enemy', angleToPlayer - spreadAngle, '💣', ENEMY_PROJECTILE_FONT_SIZE, ENEMY_PROJECTILE_SPEED)); enemyProjectiles.push(new Projectile(shootX, shootY, 'enemy', angleToPlayer, '💣', ENEMY_PROJECTILE_FONT_SIZE, ENEMY_PROJECTILE_SPEED)); enemyProjectiles.push(new Projectile(shootX, shootY, 'enemy', angleToPlayer + spreadAngle, '💣', ENEMY_PROJECTILE_FONT_SIZE, ENEMY_PROJECTILE_SPEED)); }
-            hit() { if (this.health <= 0) return false; this.health--; playSound('bossHit'); this.hitFlashTimer = 150; if (this.health <= 0) { addScore(BOSS_SCORE); playSound('bossDefeat'); bossHpBar.style.display = 'none'; gameWon = true; showGameWonMessage(); return true; } return false; }
+            hit() {
+                if (this.health <= 0) return false;
+                this.health--;
+                playSound('bossHit');
+                this.hitFlashTimer = 150;
+                if (this.health <= 0) {
+                    addScore(BOSS_SCORE);
+                    playSound('bossDefeat');
+                    bossHpBar.style.display = 'none';
+                    gameWon = true;
+                    // ▼▼▼ ゲームクリア時にBGM停止 ▼▼▼
+                    if (bgmAudio) {
+                        bgmAudio.pause();
+                        bgmAudio.currentTime = 0; // 再生位置を最初に戻す
+                    }
+                    // ▲▲▲ ゲームクリア時にBGM停止 ▲▲▲
+                    showGameWonMessage();
+                    return true;
+                 }
+                 return false;
+            }
         }
 
 
@@ -531,6 +564,13 @@
             gameRunning = false; lastEnemySpawn = 0; lastPlanetSpawn = 0;
             keys = {}; currentPowerUpIndex = -1; resetPowerUps(false); shieldHp = 0; laserActive = false;
             bossModeActive = false; boss = null; bossHpBar.style.display = 'none';
+
+            // ▼▼▼ BGMを停止（初期化時）▼▼▼
+            if (bgmAudio) {
+                bgmAudio.pause();
+                bgmAudio.currentTime = 0;
+            }
+            // ▲▲▲ BGMを停止（初期化時）▲▲▲
 
             updateScoreDisplay(); updateLivesDisplay(); updatePowerUpUI(); highlightPowerUp();
             messageBox.style.display = 'none';
@@ -552,11 +592,11 @@
         function showStartMessage() {
             // ★★★ 日本語の説明文に変更 ★★★
             messageText.innerHTML = "AIコーチ VS 学習しない組織<br>" +
-                                    "操作方法:<br>" +
-                                    "移動: 矢印キー / WASD<br>" +
-                                    "ショット: Space / Z<br>" +
-                                    "パワーアップ発動: Shift + R<br><br>" + // ★★★ キー説明を変更 ★★★
-                                    "下のボタンでゲーム開始";
+                                  "操作方法:<br>" +
+                                  "移動: 矢印キー / WASD<br>" +
+                                  "ショット: Space / Z<br>" +
+                                  "パワーアップ発動: Shift + R<br><br>" + // ★★★ キー説明を変更 ★★★
+                                  "下のボタンでゲーム開始";
             const startButton = document.getElementById('restartButton');
             startButton.textContent = "ゲームスタート"; // ボタンテキストも日本語に
             // ★★★ スタート画像を表示 ★★★
@@ -583,9 +623,29 @@
 
         // --- ゲーム開始関数 ---
         function startGame() {
+            // SE用のTone.js初期化
             if (Tone.context.state !== 'running') {
                 Tone.start().catch(e => console.error("Tone.start failed:", e));
             }
+
+            // ▼▼▼ BGM再生処理を追加 ▼▼▼
+            if (bgmAudio) {
+                // 再生を試みる (ユーザー操作起因なので許可されるはず)
+                const playPromise = bgmAudio.play();
+                if (playPromise !== undefined) {
+                    playPromise.then(_ => {
+                        // 再生成功
+                        console.log("BGM再生開始");
+                    }).catch(error => {
+                        // 自動再生ポリシーなどで失敗した場合
+                        console.error("BGM再生失敗:", error);
+                        // ここでユーザーに通知するなどの代替処理も可能
+                    });
+                }
+            }
+            // ▲▲▲ BGM再生処理を追加 ▲▲▲
+
+
             messageBox.style.display = 'none';
             // ★★★ スタート時に画像を非表示 ★★★
             startImage.style.display = 'none';
