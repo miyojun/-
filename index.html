@@ -2,9 +2,8 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
-    <title>AIコーチ VS 学習しない組織 (v13 - レスポンシブ対応)</title> AIコーチ「リフレクこ」VS　学習しない組織
-    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIコーチ VS 学習しない組織 (v14 - 日本語化・画像表示・キー変更)</title> <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">AIコーチ リフレクこ VS 学習しない組織
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.35/Tone.min.js"></script>
     <style>
         /* 基本スタイル */
@@ -119,24 +118,33 @@
             position: absolute;
             top: 50%; left: 50%;
             transform: translate(-50%, -50%);
-            background-color: rgba(0, 0, 0, 0.8);
+            background-color: rgba(0, 0, 0, 0.85); /* 少し濃く */
             color: white;
             padding: clamp(15px, 3vw, 30px); /* 可変パディング */
             border: 2px solid white;
             border-radius: 10px;
-            font-size: clamp(16px, 3.5vw, 24px); /* 可変フォントサイズ */
+            font-size: clamp(14px, 3vw, 20px); /* 少し小さく */
             text-align: center;
             display: none;
             z-index: 10;
-            width: 80%; /* 幅を制限 */
-            max-width: 500px;
+            width: 85%; /* 幅を少し広げる */
+            max-width: 550px; /* 最大幅も少し広げる */
             box-sizing: border-box;
+        }
+        /* ★★★ メッセージボックス内の画像スタイル ★★★ */
+        #startImage {
+            display: block; /* ブロック要素にして中央寄せしやすく */
+            margin: 10px auto 15px; /* 上下にマージン、左右中央 */
+            max-width: 80px; /* 最大幅 */
+            max-height: 80px; /* 最大高さ */
+            border: 1px solid #555; /* 枠線 */
+            border-radius: 5px;
         }
         #messageBox button {
             font-family: 'Press Start 2P', cursive;
             font-size: clamp(12px, 2.5vw, 16px); /* 可変フォントサイズ */
             padding: clamp(8px, 1.5vw, 10px) clamp(15px, 3vw, 20px); /* 可変パディング */
-            margin-top: clamp(10px, 2vh, 20px); /* 可変マージン */
+            margin-top: clamp(10px, 2vh, 15px); /* 少し詰める */
             cursor: pointer;
             background-color: #ffcc00;
             border: 2px solid #fff;
@@ -149,7 +157,6 @@
         /* スマートフォン横向き時の調整 */
         @media (max-width: 960px) and (orientation: landscape) {
             /* 横向きで特に調整が必要な場合ここに記述 */
-            /* 例: #powerUpBar { justify-content: space-around; } */
         }
          @media (max-height: 480px) {
              /* 縦幅が特に小さい画面への対応 */
@@ -176,6 +183,7 @@
          <div id="bossHpBar"> <div id="bossHpFill"></div>
          </div>
          <div id="messageBox">
+             <img id="startImage" src="refleko_right.png" alt="[Image of リフレクこ]">
              <div id="messageText"></div>
              <button id="restartButton">RESTART</button>
          </div>
@@ -202,6 +210,8 @@
         const restartButton = document.getElementById('restartButton');
         const bossHpBar = document.getElementById('bossHpBar');
         const bossHpFill = document.getElementById('bossHpFill');
+        // ★★★ スタート画像要素を取得 ★★★
+        const startImage = document.getElementById('startImage');
 
         let gameWidth, gameHeight; // キャンバスの解像度
         let stars = [];
@@ -215,6 +225,12 @@
         let bossImageLoaded = false;
         bossImage.onload = () => { bossImageLoaded = true; console.log("ボス画像を読み込みました。"); };
         bossImage.onerror = () => { console.error("ボス画像の読み込みに失敗しました。"); bossImage.src = 'https://placehold.co/200x200/800/fff?text=BOSS'; };
+        // ★★★ スタート画像の読み込みエラーハンドリング ★★★
+        startImage.onerror = () => {
+            console.error("スタート画像の読み込みに失敗しました。");
+            startImage.alt = "[スタート画像読み込み失敗]"; // 代替テキスト
+            startImage.style.display = 'none'; // 失敗したら非表示に
+        };
 
 
         // --- 音声設定 ---
@@ -230,10 +246,6 @@
         }
 
         // --- ゲーム設定 (要素のサイズは固定のまま) ---
-        // 注意: レスポンシブ対応したのは主にレイアウトです。
-        //       ゲーム内のオブジェクトサイズ（プレイヤー、敵、弾など）を
-        //       画面サイズに応じて動的に変更するのは、より複雑な実装になります。
-        //       現状では、画面サイズが変わるとオブジェクトの相対的な大きさが変わります。
         let PLAYER_WIDTH = 40; let PLAYER_HEIGHT = 40; const PLAYER_SPEED_BASE = 3;
         const PROJECTILE_SPEED = 7; const PROJECTILE_FONT_SIZE = 20;
         const ENEMY_SPEED_BASE = 2; const ENEMY_SPAWN_RATE = 1000; const ENEMY_FONT_SIZE = 18;
@@ -268,9 +280,9 @@
         // --- 敵の種類定義 (変更なし) ---
         const enemyTypes = {
             shortage: { text: "人手不足", width: ENEMY_FONT_SIZE * 4, height: ENEMY_FONT_SIZE * 1.2, color: '#ffdddd', health: 2, speedMultiplier: 0.9, value: 120, moveType: 'straight', dropChance: 0.15 * 1.5 },
-            powerH:   { text: "パワハラ", width: ENEMY_FONT_SIZE * 4, height: ENEMY_FONT_SIZE * 1.2, color: '#ffaaaa', health: 1, speedMultiplier: 1.2, value: 150, moveType: 'sine', dropChance: 0.2 * 1.5 },
-            overtime: { text: "残業",   width: ENEMY_FONT_SIZE * 2, height: ENEMY_FONT_SIZE * 1.2, color: '#ddddff', health: 3, speedMultiplier: 0.7, value: 100, moveType: 'straight', dropChance: 0.1 * 1.5 },
-            sexualH:  { text: "セクハラ", width: ENEMY_FONT_SIZE * 4, height: ENEMY_FONT_SIZE * 1.2, color: '#ffccff', health: 1, speedMultiplier: 1.1, value: 140, moveType: 'sine', dropChance: 0.18 * 1.5 },
+            powerH:   { text: "パワハラ", width: ENEMY_FONT_SIZE * 4, height: ENEMY_FONT_SIZE * 1.2, color: '#ffaaaa', health: 1, speedMultiplier: 1.2, value: 150, moveType: 'sine', dropChance: 0.2 * 1.5 },
+            overtime: { text: "残業",   width: ENEMY_FONT_SIZE * 2, height: ENEMY_FONT_SIZE * 1.2, color: '#ddddff', health: 3, speedMultiplier: 0.7, value: 100, moveType: 'straight', dropChance: 0.1 * 1.5 },
+            sexualH:  { text: "セクハラ", width: ENEMY_FONT_SIZE * 4, height: ENEMY_FONT_SIZE * 1.2, color: '#ffccff', health: 1, speedMultiplier: 1.1, value: 140, moveType: 'sine', dropChance: 0.18 * 1.5 },
             turnover: { text: "高離職率", width: ENEMY_FONT_SIZE * 5, height: ENEMY_FONT_SIZE * 1.2, color: '#ffffcc', health: 2, speedMultiplier: 1.0, value: 130, moveType: 'straight', dropChance: 0.22 * 1.5 },
             nonLearningOrg: { text: "学習しない組織", width: ENEMY_FONT_SIZE * 7, height: ENEMY_FONT_SIZE * 1.2, color: '#aaaaaa', health: 5, speedMultiplier: 0.6, value: 300, moveType: 'straight', dropChance: 0.15 * 1.5 },
             resistance: { text: "抵抗勢力", width: ENEMY_FONT_SIZE * 4, height: ENEMY_FONT_SIZE * 1.2, color: '#cc5555', health: 2, speedMultiplier: 0.5, value: 180, moveType: 'shooter', dropChance: 0.2 * 1.5, shootCooldown: 2500 }
@@ -436,7 +448,7 @@
                  const targetY = playerCenterY + Math.sin(currentOrbitAngle) * ORBIT_RADIUS - this.height / 2;
                  this.x = targetX; this.y = targetY;
                  if (this.shootCooldown > 0) this.shootCooldown -= 16.67;
-            }
+             }
             shoot(isLaser) { if (this.shootCooldown <= 0) { this.shootCooldown = 200; const projectileY = this.y + this.height / 2; const projectileX = this.x + this.width; if (isLaser) { projectiles.push(new Projectile(projectileX, projectileY, 'player', 0, '?', PROJECTILE_FONT_SIZE)); playSound('laser'); } else { projectiles.push(new Projectile(projectileX, projectileY, 'player', 0, '💬', PROJECTILE_FONT_SIZE)); playSound('shoot'); } } }
         }
 
@@ -536,13 +548,55 @@
             window.addEventListener('orientationchange', handleResize); // ★ 画面回転イベントにも対応
         }
 
-        // --- メッセージ表示関数 (変更なし) ---
-        function showStartMessage() { messageText.innerHTML = "AIコーチ VS 学習しない組織<br>Arrow Keys/WASD: Move<br>Space/Z: Shoot<br>Shift/X: Activate PowerUp<br><br>PRESS START BUTTON"; const startButton = document.getElementById('restartButton'); startButton.textContent = "START GAME"; messageBox.style.display = 'block'; gameRunning = false; }
-        function showGameOverMessage() { messageText.innerHTML = `GAME OVER<br>FINAL SCORE: ${score}`; const restartBtn = document.getElementById('restartButton'); restartBtn.textContent = "RESTART"; messageBox.style.display = 'block'; gameRunning = false; }
-        function showGameWonMessage() { messageText.innerHTML = `CONGRATULATIONS!<br>YOU WIN!<br>FINAL SCORE: ${score}`; const restartBtn = document.getElementById('restartButton'); restartBtn.textContent = "PLAY AGAIN?"; messageBox.style.display = 'block'; gameRunning = false; }
+        // --- メッセージ表示関数 ---
+        function showStartMessage() {
+            // ★★★ 日本語の説明文に変更 ★★★
+            messageText.innerHTML = "AIコーチ VS 学習しない組織<br>" +
+                                    "操作方法:<br>" +
+                                    "移動: 矢印キー / WASD<br>" +
+                                    "ショット: Space / Z<br>" +
+                                    "パワーアップ発動: Shift + R<br><br>" + // ★★★ キー説明を変更 ★★★
+                                    "下のボタンでゲーム開始";
+            const startButton = document.getElementById('restartButton');
+            startButton.textContent = "ゲームスタート"; // ボタンテキストも日本語に
+            // ★★★ スタート画像を表示 ★★★
+            startImage.style.display = 'block';
+            messageBox.style.display = 'block';
+            gameRunning = false;
+        }
+        function showGameOverMessage() {
+            messageText.innerHTML = `ゲームオーバー<br>最終スコア: ${score}`;
+            const restartBtn = document.getElementById('restartButton');
+            restartBtn.textContent = "リスタート";
+            startImage.style.display = 'none'; // ゲームオーバー時は画像を非表示
+            messageBox.style.display = 'block';
+            gameRunning = false;
+        }
+        function showGameWonMessage() {
+            messageText.innerHTML = `クリア！<br>おめでとうございます！<br>最終スコア: ${score}`;
+            const restartBtn = document.getElementById('restartButton');
+            restartBtn.textContent = "もう一度プレイ";
+            startImage.style.display = 'none'; // クリア時も画像を非表示
+            messageBox.style.display = 'block';
+            gameRunning = false;
+        }
 
-        // --- ゲーム開始関数 (変更なし) ---
-        function startGame() { if (Tone.context.state !== 'running') { Tone.start().catch(e => console.error("Tone.start failed:", e)); } messageBox.style.display = 'none'; if (gameOver || gameWon) { init(); } gameOver = false; gameWon = false; gameRunning = true; requestAnimationFrame(gameLoop); }
+        // --- ゲーム開始関数 ---
+        function startGame() {
+            if (Tone.context.state !== 'running') {
+                Tone.start().catch(e => console.error("Tone.start failed:", e));
+            }
+            messageBox.style.display = 'none';
+            // ★★★ スタート時に画像を非表示 ★★★
+            startImage.style.display = 'none';
+            if (gameOver || gameWon) {
+                init(); // ゲームオーバー/クリア後の再スタートなら初期化
+            }
+            gameOver = false;
+            gameWon = false;
+            gameRunning = true;
+            requestAnimationFrame(gameLoop);
+        }
 
         // --- リサイズ処理 ---
         // ▼▼▼ リサイズ処理を更新 ▼▼▼
@@ -552,7 +606,6 @@
             const containerHeight = gameContainer.clientHeight;
 
             // キャンバスの解像度（内部的な描画サイズ）を設定
-            // ここではコンテナの表示サイズに合わせる
             canvas.width = containerWidth;
             canvas.height = containerHeight;
 
@@ -562,8 +615,7 @@
 
             // パワーアップバーの幅をコンテナに合わせる
             powerUpBar.style.width = `${containerWidth}px`;
-            // 最大幅も設定しておく
-            powerUpBar.style.maxWidth = '960px';
+            powerUpBar.style.maxWidth = '960px'; // 最大幅も設定
 
             // 星の位置を再計算（画面外に出ないように）
             stars.forEach(star => {
@@ -597,7 +649,7 @@
                 const element = document.getElementById(type);
                 if (element) {
                     let isActive = false;
-                    let text = element.textContent.split(' (')[0];
+                    let text = element.textContent.split(' (')[0]; // 元のテキストを取得
                     switch(type) {
                         case 'productivity': isActive = activePowerUps.productivity > 0; text = isActive ? `生産性UP (${activePowerUps.productivity})` : '生産性UP'; break;
                         case 'aiAgent': isActive = activePowerUps.aiAgent > 0; text = isActive ? `AIエージェント (${activePowerUps.aiAgent})` : 'AIエージェント'; break;
@@ -662,7 +714,7 @@
                  // ▼▼▼ 画面外判定を gameWidth/Height に合わせる ▼▼▼
                  return proj.x > -proj.width && proj.x < gameWidth + proj.width && proj.y > -proj.height && proj.y < gameHeight + proj.height;
                  // ▲▲▲ 画面外判定を gameWidth/Height に合わせる ▲▲▲
-            });
+             });
 
             // プレイヤーミサイル vs 敵/ボス
              missiles = missiles.filter(missile => {
@@ -675,7 +727,7 @@
                  // ▼▼▼ 画面外判定を gameWidth/Height に合わせる ▼▼▼
                  return missile.x < gameWidth + 50 && missile.x > -missile.width && missile.y < gameHeight + 50 && missile.y > -missile.height;
                  // ▲▲▲ 画面外判定を gameWidth/Height に合わせる ▲▲▲
-             });
+              });
 
             // プレイヤー vs 敵/ボス
             if (!player.invincible) {
@@ -690,8 +742,31 @@
         }
         function isColliding(rect1, rect2) { return rect1.x < rect2.x + rect2.width && rect1.x + rect1.width > rect2.x && rect1.y < rect2.y + rect2.height && rect1.y + rect1.height > rect2.y; }
 
-        // --- キーボード入力 (変更なし) ---
-        function handleKeyDown(e) { if (!gameRunning && messageBox.style.display === 'block') { if (e.key === 'Shift' || e.key.toLowerCase() === 'x') { e.preventDefault(); return; } if (e.key === ' ' || e.key.toLowerCase() === 'z') { e.preventDefault(); return; } } else if (gameRunning) { keys[e.key] = true; if ((e.key === 'Shift' || e.key.toLowerCase() === 'x') && !e.repeat) { player.activatePowerUp(); } if (e.key === ' ' || e.key.toLowerCase() === 'z') { keys[e.key] = true; } } if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'Shift', 'z', 'x', 'w', 'a', 's', 'd'].includes(e.key)) { e.preventDefault(); } }
+        // --- キーボード入力 ---
+        function handleKeyDown(e) {
+            // メッセージ表示中は特定のキー操作を制限
+            if (!gameRunning && messageBox.style.display === 'block') {
+                // Shift+R や Space/Z は無効化
+                if ((e.shiftKey && e.key.toLowerCase() === 'r') || e.key === ' ' || e.key.toLowerCase() === 'z') {
+                    e.preventDefault();
+                    return;
+                }
+            } else if (gameRunning) {
+                keys[e.key] = true;
+                // ★★★ パワーアップ発動キーを Shift + R に変更 ★★★
+                if (e.shiftKey && e.key.toLowerCase() === 'r' && !e.repeat) {
+                    player.activatePowerUp();
+                }
+                // スペースまたはZキーの処理 (変更なし)
+                if (e.key === ' ' || e.key.toLowerCase() === 'z') {
+                    keys[e.key] = true; // 押しっぱなし対応
+                }
+            }
+            // デフォルトのスクロールなどを防ぐキー
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'Shift', 'z', 'r', 'w', 'a', 's', 'd'].includes(e.key)) { // 'x' を 'r' に変更
+                e.preventDefault();
+            }
+        }
         function handleKeyUp(e) { keys[e.key] = false; }
 
         // --- ゲームループ (描画/更新は gameWidth/Height に依存) ---
