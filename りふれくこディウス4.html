@@ -2,42 +2,168 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>リフレクこVS学習しない組織 (v10 - ボス条件・幅変更)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
+    <title>AIコーチ VS 学習しない組織 (v13 - レスポンシブ対応)</title> AIコーチ「リフレクこ」VS　学習しない組織
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.35/Tone.min.js"></script>
     <style>
-        body { display: flex; justify-content: center; align-items: center; min-height: 100vh; background-color: #222; margin: 0; font-family: 'Press Start 2P', cursive; color: #fff; flex-direction: column; }
+        /* 基本スタイル */
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            background-color: #222;
+            color: #fff;
+            font-family: 'Press Start 2P', cursive;
+            overflow: hidden; /* スクロールバーを隠す */
+        }
+        body {
+            display: flex;
+            flex-direction: column; /* 縦並び */
+            justify-content: center; /* 中央寄せ（垂直） */
+            align-items: center; /* 中央寄せ（水平） */
+            min-height: 100vh; /* 画面の高さいっぱいに */
+        }
+
+        /* ゲームコンテナのレスポンシブ設定 */
         #gameContainer {
             position: relative;
-            width: 960px; /* ★ 横幅を960pxに変更 */
-            height: 600px;
+            /* ▼▼▼ 幅とアスペクト比でサイズを決定 ▼▼▼ */
+            width: 95vw; /* 画面幅の95% */
+            max-width: 960px; /* PCでの最大幅 */
+            aspect-ratio: 16 / 10; /* 縦横比を16:10に固定 */
+            max-height: 90vh; /* 画面高さの90%を上限に */
+            /* ▲▲▲ 幅とアスペクト比でサイズを決定 ▲▲▲ */
             border: 3px solid #fff;
             background-color: #000;
             overflow: hidden;
-            margin-bottom: 10px;
+            margin: 10px auto; /* 上下にマージン、左右は自動で中央寄せ */
+            box-sizing: border-box;
         }
-        canvas { display: block; background-color: #111; image-rendering: pixelated; }
+
+        /* キャンバス */
+        canvas {
+            display: block;
+            width: 100%; /* コンテナいっぱいに表示 */
+            height: 100%; /* コンテナいっぱいに表示 */
+            background-color: #111;
+            image-rendering: pixelated; /* ドット絵感を維持 */
+        }
+
+        /* パワーアップバー */
         #powerUpBar {
             display: flex;
             justify-content: center;
             align-items: center;
             background-color: #333;
-            padding: 5px;
+            padding: clamp(3px, 0.8vw, 5px); /* 可変パディング */
             border: 2px solid #fff;
             border-radius: 5px;
-            width: 956px; /* ★ コンテナ幅に合わせて調整 (960 - 4) */
+            /* ▼▼▼ 幅はJSでコンテナに合わせる ▼▼▼ */
+            width: 95vw; /* 初期値 (JSで上書き) */
+            max-width: 960px; /* PCでの最大幅 */
+            /* ▲▲▲ 幅はJSでコンテナに合わせる ▲▲▲ */
             box-sizing: border-box;
+            margin: 5px auto 0; /* 上マージン、左右中央 */
+            flex-wrap: wrap; /* 小画面で折り返す可能性 */
+            gap: clamp(3px, 0.5vw, 5px); /* アイテム間の隙間 */
         }
-        .powerUpItem { padding: 5px 10px; margin: 0 5px; border: 1px solid #555; color: #888; font-size: 12px; cursor: default; transition: all 0.2s ease; text-align: center; min-width: 60px; }
+        .powerUpItem {
+            padding: clamp(3px, 0.8vw, 5px) clamp(5px, 1vw, 10px); /* 可変パディング */
+            border: 1px solid #555;
+            color: #888;
+            /* ▼▼▼ フォントサイズを可変に ▼▼▼ */
+            font-size: clamp(8px, 1.5vw, 12px);
+            /* ▲▲▲ フォントサイズを可変に ▲▲▲ */
+            cursor: default;
+            transition: all 0.2s ease;
+            text-align: center;
+            min-width: clamp(60px, 10vw, 90px); /* 可変最小幅 */
+            white-space: nowrap;
+            flex-grow: 1; /* スペースがあれば広がる */
+            flex-basis: 80px; /* 基本幅 */
+        }
         .powerUpItem.highlighted { background-color: #ffcc00; color: #000; border-color: #fff; box-shadow: 0 0 10px #ffcc00; }
         .powerUpItem.active { background-color: #ff6600; color: #fff; border-color: #fff; }
-        #uiLayer { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; font-size: 16px; pointer-events: none; text-shadow: 1px 1px 2px #000; }
-        #bossHpBar { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); width: 300px; height: 15px; border: 2px solid #fff; background-color: #555; display: none; z-index: 5; }
+
+        /* UIレイヤー（スコア、ライフ） */
+        #uiLayer {
+            position: absolute;
+            top: clamp(5px, 1vw, 10px); /* 可変 */
+            left: clamp(5px, 1vw, 10px); /* 可変 */
+            right: clamp(5px, 1vw, 10px); /* 可変 */
+            display: flex;
+            justify-content: space-between;
+            font-size: clamp(10px, 2vw, 16px); /* 可変フォントサイズ */
+            pointer-events: none;
+            text-shadow: 1px 1px 2px #000;
+        }
+
+        /* ボスHPバー */
+        #bossHpBar {
+            position: absolute;
+            bottom: clamp(5px, 1vw, 10px); /* 可変 */
+            left: 50%;
+            transform: translateX(-50%);
+            width: clamp(150px, 30vw, 300px); /* 可変幅 */
+            height: clamp(10px, 1.5vh, 15px); /* 可変高さ */
+            border: 2px solid #fff;
+            background-color: #555;
+            display: none;
+            z-index: 5;
+        }
         #bossHpFill { width: 100%; height: 100%; background-color: #ff4444; transition: width 0.2s ease-out; }
-        #messageBox { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: rgba(0, 0, 0, 0.8); color: white; padding: 30px; border: 2px solid white; border-radius: 10px; font-size: 24px; text-align: center; display: none; z-index: 10; }
-        #messageBox button { font-family: 'Press Start 2P', cursive; font-size: 16px; padding: 10px 20px; margin-top: 20px; cursor: pointer; background-color: #ffcc00; border: 2px solid #fff; color: #000; border-radius: 5px; transition: background-color 0.3s; }
+
+        /* メッセージボックス */
+        #messageBox {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: clamp(15px, 3vw, 30px); /* 可変パディング */
+            border: 2px solid white;
+            border-radius: 10px;
+            font-size: clamp(16px, 3.5vw, 24px); /* 可変フォントサイズ */
+            text-align: center;
+            display: none;
+            z-index: 10;
+            width: 80%; /* 幅を制限 */
+            max-width: 500px;
+            box-sizing: border-box;
+        }
+        #messageBox button {
+            font-family: 'Press Start 2P', cursive;
+            font-size: clamp(12px, 2.5vw, 16px); /* 可変フォントサイズ */
+            padding: clamp(8px, 1.5vw, 10px) clamp(15px, 3vw, 20px); /* 可変パディング */
+            margin-top: clamp(10px, 2vh, 20px); /* 可変マージン */
+            cursor: pointer;
+            background-color: #ffcc00;
+            border: 2px solid #fff;
+            color: #000;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
         #messageBox button:hover { background-color: #ffa500; }
+
+        /* スマートフォン横向き時の調整 */
+        @media (max-width: 960px) and (orientation: landscape) {
+            /* 横向きで特に調整が必要な場合ここに記述 */
+            /* 例: #powerUpBar { justify-content: space-around; } */
+        }
+         @media (max-height: 480px) {
+             /* 縦幅が特に小さい画面への対応 */
+             #gameContainer {
+                 max-height: 95vh; /* 高さをさらに確保 */
+             }
+             #powerUpBar {
+                 margin-top: 3px;
+             }
+             #uiLayer, #bossHpBar {
+                 font-size: clamp(8px, 2vw, 12px); /* UIフォントを小さく */
+             }
+         }
+
     </style>
 </head>
 <body>
@@ -50,17 +176,17 @@
          <div id="bossHpBar"> <div id="bossHpFill"></div>
          </div>
          <div id="messageBox">
-            <div id="messageText"></div>
-            <button id="restartButton">RESTART</button>
-        </div>
+             <div id="messageText"></div>
+             <button id="restartButton">RESTART</button>
+         </div>
     </div>
     <div id="powerUpBar">
-        <div class="powerUpItem" id="speed">SPEED UP</div>
-        <div class="powerUpItem" id="missile">MISSILE</div>
-        <div class="powerUpItem" id="double">DOUBLE</div>
-        <div class="powerUpItem" id="laser">LASER</div>
-        <div class="powerUpItem" id="option">OPTION</div>
-        <div class="powerUpItem" id="shield">? (SHIELD)</div>
+        <div class="powerUpItem" id="productivity">生産性UP</div>
+        <div class="powerUpItem" id="inquiry">問いかけ</div>
+        <div class="powerUpItem" id="aiFeedback">AIフィードバック</div>
+        <div class="powerUpItem" id="learningBeam">経験学習ビーム</div>
+        <div class="powerUpItem" id="aiAgent">AIエージェント</div>
+        <div class="powerUpItem" id="safety">心理的安全性</div>
     </div>
 
     <script>
@@ -77,43 +203,50 @@
         const bossHpBar = document.getElementById('bossHpBar');
         const bossHpFill = document.getElementById('bossHpFill');
 
-        let gameWidth, gameHeight;
+        let gameWidth, gameHeight; // キャンバスの解像度
         let stars = [];
 
-        // --- 画像読み込み (変更なし) ---
+        // --- 画像読み込み ---
         const playerImage = new Image(); playerImage.src = 'refleko_right.png';
-        let playerImageLoaded = false; playerImage.onload = () => { playerImageLoaded = true; console.log("プレイヤー画像を読み込みました。"); }; playerImage.onerror = () => { console.error("プレイヤー画像の読み込みに失敗しました。"); };
+        let playerImageLoaded = false; playerImage.onload = () => { playerImageLoaded = true; console.log("プレイヤー画像を読み込みました。"); }; playerImage.onerror = () => { console.error("プレイヤー画像の読み込みに失敗しました。"); playerImage.src = 'https://placehold.co/40x40/0f0/fff?text=P'; };
         const optionImage = new Image(); optionImage.src = 'reflect_logo_3.png';
-        let optionImageLoaded = false; optionImage.onload = () => { optionImageLoaded = true; console.log("オプション画像を読み込みました。"); }; optionImage.onerror = () => { console.error("オプション画像の読み込みに失敗しました。"); };
+        let optionImageLoaded = false; optionImage.onload = () => { optionImageLoaded = true; console.log("オプション画像を読み込みました。"); }; optionImage.onerror = () => { console.error("オプション画像の読み込みに失敗しました。"); optionImage.src = 'https://placehold.co/38x38/0af/fff?text=O'; };
         const bossImage = new Image(); bossImage.src = 'bigwork.png';
         let bossImageLoaded = false;
         bossImage.onload = () => { bossImageLoaded = true; console.log("ボス画像を読み込みました。"); };
-        bossImage.onerror = () => { console.error("ボス画像の読み込みに失敗しました。"); };
+        bossImage.onerror = () => { console.error("ボス画像の読み込みに失敗しました。"); bossImage.src = 'https://placehold.co/200x200/800/fff?text=BOSS'; };
 
 
-        // --- 音声設定 (変更なし) ---
+        // --- 音声設定 ---
         const synth = new Tone.Synth().toDestination();
         const metalSynth = new Tone.MetalSynth({ frequency: 150, envelope: { attack: 0.001, decay: 0.1, release: 0.01 }, harmonicity: 3.1, modulationIndex: 16, resonance: 4000, octaves: 0.5 }).toDestination();
         const noiseSynth = new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.1 } }).toDestination();
         const bombSynth = new Tone.MembraneSynth({ pitchDecay: 0.08, octaves: 10, oscillator: { type: 'sine' }, envelope: { attack: 0.001, decay: 0.5, sustain: 0.1, release: 1.4, attackCurve: 'exponential' } }).toDestination();
 
-        function playSound(type) { /* ...変更なし... */
+        function playSound(type) {
+             // (音声再生ロジックは変更なし)
              if (!Tone.context.state || Tone.context.state !== 'running') { console.log("AudioContext is not running. Trying to resume..."); Tone.start().catch(e => console.error("Tone.start failed:", e)); }
-            try { switch (type) { case 'shoot': synth.triggerAttackRelease("C5", "16n"); break; case 'enemyHit': noiseSynth.triggerAttackRelease("8n"); break; case 'playerHit': metalSynth.triggerAttackRelease("16n"); break; case 'powerupCollect': synth.triggerAttackRelease("E5", "8n"); break; case 'powerupActivate': synth.triggerAttackRelease("G5", "8n"); break; case 'gameOver': synth.triggerAttackRelease("C3", "4n", Tone.now()); synth.triggerAttackRelease("G2", "4n", Tone.now() + 0.2); synth.triggerAttackRelease("E2", "4n", Tone.now() + 0.4); synth.triggerAttackRelease("C2", "2n", Tone.now() + 0.6); break; case 'missile': const missileNoise = new Tone.NoiseSynth({ noise: { type: 'pink' }, envelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.1 } }).toDestination(); missileNoise.triggerAttackRelease("8n"); break; case 'laser': synth.triggerAttackRelease("A5", "64n"); break; case 'enemyShoot': bombSynth.triggerAttackRelease("C2", "8n"); break; case 'bossHit': metalSynth.triggerAttackRelease("8n", 0.5); break; case 'bossDefeat': synth.triggerAttackRelease("C6", "2n", Tone.now()); synth.triggerAttackRelease("G5", "2n", Tone.now()+0.1); synth.triggerAttackRelease("E5", "2n", Tone.now()+0.2); synth.triggerAttackRelease("C5", "1n", Tone.now()+0.3); break; } } catch (error) { console.error("Error playing sound:", error); }
+             try { switch (type) { case 'shoot': synth.triggerAttackRelease("C5", "16n"); break; case 'enemyHit': noiseSynth.triggerAttackRelease("8n"); break; case 'playerHit': metalSynth.triggerAttackRelease("16n"); break; case 'powerupCollect': synth.triggerAttackRelease("E5", "8n"); break; case 'powerupActivate': synth.triggerAttackRelease("G5", "8n"); break; case 'gameOver': synth.triggerAttackRelease("C3", "4n", Tone.now()); synth.triggerAttackRelease("G2", "4n", Tone.now() + 0.2); synth.triggerAttackRelease("E2", "4n", Tone.now() + 0.4); synth.triggerAttackRelease("C2", "2n", Tone.now() + 0.6); break; case 'missile': const missileNoise = new Tone.NoiseSynth({ noise: { type: 'pink' }, envelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.1 } }).toDestination(); missileNoise.triggerAttackRelease("8n"); break; case 'laser': synth.triggerAttackRelease("A5", "64n"); break; case 'enemyShoot': bombSynth.triggerAttackRelease("C2", "8n"); break; case 'bossHit': metalSynth.triggerAttackRelease("8n", 0.5); break; case 'bossDefeat': synth.triggerAttackRelease("C6", "2n", Tone.now()); synth.triggerAttackRelease("G5", "2n", Tone.now()+0.1); synth.triggerAttackRelease("E5", "2n", Tone.now()+0.2); synth.triggerAttackRelease("C5", "1n", Tone.now()+0.3); break; } } catch (error) { console.error("Error playing sound:", error); }
         }
 
-        // --- ゲーム設定 (★ BOSS_TRIGGER_SCORE 変更) ---
+        // --- ゲーム設定 (要素のサイズは固定のまま) ---
+        // 注意: レスポンシブ対応したのは主にレイアウトです。
+        //       ゲーム内のオブジェクトサイズ（プレイヤー、敵、弾など）を
+        //       画面サイズに応じて動的に変更するのは、より複雑な実装になります。
+        //       現状では、画面サイズが変わるとオブジェクトの相対的な大きさが変わります。
         let PLAYER_WIDTH = 40; let PLAYER_HEIGHT = 40; const PLAYER_SPEED_BASE = 3;
         const PROJECTILE_SPEED = 7; const PROJECTILE_FONT_SIZE = 20;
         const ENEMY_SPEED_BASE = 2; const ENEMY_SPAWN_RATE = 1000; const ENEMY_FONT_SIZE = 18;
         const ENEMY_PROJECTILE_SPEED = 3; const ENEMY_PROJECTILE_FONT_SIZE = 18;
         const POWERUP_ITEM_SPEED = 1.5; const POWERUP_ITEM_WIDTH = 12; const POWERUP_ITEM_HEIGHT = 20;
         const MISSILE_SPEED = 4; const MISSILE_FONT_SIZE = 20;
-        const OPTION_WIDTH = 38; const OPTION_HEIGHT = 38; const OPTION_DISTANCE = 68;
+        const OPTION_WIDTH = 38; const OPTION_HEIGHT = 38;
+        const ORBIT_RADIUS = 55;
+        const ORBIT_SPEED = 0.05;
         const STAR_COUNT = 100; const STAR_SPEED_FACTOR = 0.5;
         const PLANET_SPAWN_RATE = 8000; const PLANET_SPEED = 0.5;
         const LASER_TEXT = "経験学習-".repeat(7); const LASER_FONT_SIZE = 14;
-        const BOSS_TRIGGER_SCORE = 15000; // ★ ボス出現スコアを15000に変更
+        const BOSS_TRIGGER_SCORE = 15000;
         const BOSS_WIDTH = 200; const BOSS_HEIGHT = 200; const BOSS_MAX_HEALTH = 150;
         const BOSS_SHOOT_COOLDOWN = 1500; const BOSS_SCORE = 5000;
 
@@ -121,18 +254,19 @@
         let player; let projectiles = []; let enemyProjectiles = []; let missiles = []; let enemies = []; let powerUpItemsList = []; let options = []; let terrain = [];
         let score = 0; let lives = 3; let gameOver = false; let gameWon = false;
         let gameRunning = false;
-        let lastEnemySpawn = 0; let lastPlanetSpawn = 0;
+        let lastEnemySpawn = 0; lastPlanetSpawn = 0;
         let keys = {}; let currentPowerUpIndex = -1;
-        let activePowerUps = { speed: 0, missile: false, double: false, laser: false, option: 0, shield: false };
-        let shieldHp = 0; let laserActive = false;
+        let activePowerUps = { productivity: 0, inquiry: false, aiFeedback: false, learningBeam: false, aiAgent: 0, safety: false };
+        let shieldHp = 0;
+        let laserActive = false;
         let enemySpawnPool = [];
         let bossModeActive = false;
         let boss = null;
 
-        const powerUpTypes = ['speed', 'missile', 'double', 'laser', 'option', 'shield'];
+        const powerUpTypes = ['productivity', 'inquiry', 'aiFeedback', 'learningBeam', 'aiAgent', 'safety'];
 
         // --- 敵の種類定義 (変更なし) ---
-        const enemyTypes = { /* ...変更なし... */
+        const enemyTypes = {
             shortage: { text: "人手不足", width: ENEMY_FONT_SIZE * 4, height: ENEMY_FONT_SIZE * 1.2, color: '#ffdddd', health: 2, speedMultiplier: 0.9, value: 120, moveType: 'straight', dropChance: 0.15 * 1.5 },
             powerH:   { text: "パワハラ", width: ENEMY_FONT_SIZE * 4, height: ENEMY_FONT_SIZE * 1.2, color: '#ffaaaa', health: 1, speedMultiplier: 1.2, value: 150, moveType: 'sine', dropChance: 0.2 * 1.5 },
             overtime: { text: "残業",   width: ENEMY_FONT_SIZE * 2, height: ENEMY_FONT_SIZE * 1.2, color: '#ddddff', health: 3, speedMultiplier: 0.7, value: 100, moveType: 'straight', dropChance: 0.1 * 1.5 },
@@ -142,267 +276,364 @@
             resistance: { text: "抵抗勢力", width: ENEMY_FONT_SIZE * 4, height: ENEMY_FONT_SIZE * 1.2, color: '#cc5555', health: 2, speedMultiplier: 0.5, value: 180, moveType: 'shooter', dropChance: 0.2 * 1.5, shootCooldown: 2500 }
         };
 
-        // --- プレイヤーオブジェクトクラス (変更なし) ---
-        class Player { /* ...変更なし... */
-             constructor(x, y) { this.x = x; this.y = y; this.width = PLAYER_WIDTH; this.height = PLAYER_HEIGHT; this.speed = PLAYER_SPEED_BASE; this.shootCooldown = 0; this.missileCooldown = 0; this.laserDuration = 0; this.invincible = false; this.invincibleTimer = 0; }
-            draw(ctx) { let drawPlayer = true; if (this.invincible) { drawPlayer = Math.floor(this.invincibleTimer / 100) % 2 === 0; } if (drawPlayer) { if (playerImageLoaded) { ctx.drawImage(playerImage, this.x, this.y, this.width, this.height); } else { ctx.fillStyle = '#00ff00'; ctx.fillRect(this.x, this.y, this.width, this.height); ctx.fillStyle = '#ffffff'; ctx.fillRect(this.x + 5, this.y + 5, this.width - 10, this.height - 10); ctx.fillStyle = '#000000'; ctx.fillRect(this.x + this.width / 2 - 2 , this.y + 5, 4, this.height - 10); } } if (activePowerUps.shield && shieldHp > 0) { ctx.save(); ctx.globalAlpha = 0.5 + shieldHp * 0.25; ctx.strokeStyle = `rgba(0, 150, 255, 1)`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(this.x + this.width / 2, this.y + this.height / 2, this.width / 1.5, 0, Math.PI * 2); ctx.stroke(); ctx.restore(); ctx.lineWidth = 1; } }
-            update() { if (this.invincible) { this.invincibleTimer -= 1000/60; if (this.invincibleTimer <= 0) { this.invincible = false; } } if (keys['ArrowUp'] || keys['w']) this.y -= this.speed; if (keys['ArrowDown'] || keys['s']) this.y += this.speed; if (keys['ArrowLeft'] || keys['a']) this.x -= this.speed; if (keys['ArrowRight'] || keys['d']) this.x += this.speed; this.x = Math.max(0, Math.min(this.x, gameWidth - this.width)); this.y = Math.max(0, Math.min(this.y, gameHeight - this.height)); if (this.shootCooldown > 0) this.shootCooldown -= 16.67; if (this.missileCooldown > 0) this.missileCooldown -= 16.67; if (this.laserDuration > 0) this.laserDuration -= 16.67; else laserActive = false; if ((keys[' '] || keys['z']) && this.shootCooldown <= 0) { this.shoot(); } if (activePowerUps.missile && this.missileCooldown <= 0) { this.fireMissile(); this.missileCooldown = 800; } options.forEach((option, index) => { option.update(this.x, this.y, index); }); }
-             shoot() { if (gameOver || gameWon) return; this.shootCooldown = activePowerUps.laser ? 50 : 200; const projectileY = this.y + this.height / 2; if (activePowerUps.laser) { laserActive = true; this.laserDuration = 150; playSound('laser'); } else { projectiles.push(new Projectile(this.x + this.width, projectileY, 'player', 0, '💬', PROJECTILE_FONT_SIZE)); playSound('shoot'); if (activePowerUps.double) { projectiles.push(new Projectile(this.x + this.width, projectileY - 10, 'player', Math.PI / 18, '💬', PROJECTILE_FONT_SIZE)); projectiles.push(new Projectile(this.x + this.width, projectileY + 10, 'player', -Math.PI / 18, '💬', PROJECTILE_FONT_SIZE)); } } options.forEach(option => option.shoot(activePowerUps.laser)); }
-            fireMissile() { if (gameOver || gameWon) return; missiles.push(new Missile(this.x + this.width / 2, this.y + this.height, 'down')); missiles.push(new Missile(this.x + this.width / 2, this.y, 'up')); playSound('missile'); }
-            activatePowerUp() { if (currentPowerUpIndex !== -1) { const selectedPowerUp = powerUpTypes[currentPowerUpIndex]; playSound('powerupActivate'); switch (selectedPowerUp) { case 'speed': activePowerUps.speed++; this.speed = PLAYER_SPEED_BASE + activePowerUps.speed * 1; break; case 'missile': activePowerUps.missile = true; break; case 'double': activePowerUps.double = true; activePowerUps.laser = false; break; case 'laser': activePowerUps.laser = true; activePowerUps.double = false; break; case 'option': if (activePowerUps.option < 2) { activePowerUps.option++; options.push(new Option()); } break; case 'shield': activePowerUps.shield = true; shieldHp = 2; break; } updatePowerUpUI(); currentPowerUpIndex = -1; highlightPowerUp(); } }
-            hit() { if (this.invincible || gameWon) return; playSound('playerHit'); if (activePowerUps.shield && shieldHp > 0) { shieldHp--; this.setInvincible(500); if (shieldHp <= 0) { activePowerUps.shield = false; const shieldElement = document.getElementById('shield'); if (shieldElement) shieldElement.classList.remove('active'); } return; } lives--; updateLivesDisplay(); resetPowerUps(); if (lives <= 0) { gameOver = true; playSound('gameOver'); showGameOverMessage(); } else { this.x = 50; this.y = gameHeight / 2 - PLAYER_HEIGHT / 2; this.setInvincible(2000); } }
+        // --- プレイヤークラス (描画座標は gameWidth/Height に依存) ---
+        class Player {
+            constructor(x, y) { this.x = x; this.y = y; this.width = PLAYER_WIDTH; this.height = PLAYER_HEIGHT; this.speed = PLAYER_SPEED_BASE; this.shootCooldown = 0; this.missileCooldown = 0; this.laserDuration = 0; this.invincible = false; this.invincibleTimer = 0; }
+            draw(ctx) {
+                let drawPlayer = true;
+                if (this.invincible) { drawPlayer = Math.floor(this.invincibleTimer / 100) % 2 === 0; }
+                if (drawPlayer) {
+                    if (playerImageLoaded) { ctx.drawImage(playerImage, this.x, this.y, this.width, this.height); }
+                    else { ctx.fillStyle = '#00ff00'; ctx.fillRect(this.x, this.y, this.width, this.height); ctx.fillStyle = '#ffffff'; ctx.fillRect(this.x + 5, this.y + 5, this.width - 10, this.height - 10); ctx.fillStyle = '#000000'; ctx.fillRect(this.x + this.width / 2 - 2 , this.y + 5, 4, this.height - 10); }
+                }
+                if (activePowerUps.safety && shieldHp > 0) {
+                    ctx.save(); ctx.globalAlpha = 0.5 + shieldHp * 0.25; ctx.strokeStyle = `rgba(0, 150, 255, 1)`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(this.x + this.width / 2, this.y + this.height / 2, this.width / 1.5, 0, Math.PI * 2); ctx.stroke(); ctx.restore(); ctx.lineWidth = 1;
+                }
+            }
+            update() {
+                if (this.invincible) { this.invincibleTimer -= 1000/60; if (this.invincibleTimer <= 0) { this.invincible = false; } }
+                // ▼▼▼ 移動範囲を gameWidth/Height に合わせる ▼▼▼
+                if (keys['ArrowUp'] || keys['w']) this.y -= this.speed;
+                if (keys['ArrowDown'] || keys['s']) this.y += this.speed;
+                if (keys['ArrowLeft'] || keys['a']) this.x -= this.speed;
+                if (keys['ArrowRight'] || keys['d']) this.x += this.speed;
+                this.x = Math.max(0, Math.min(this.x, gameWidth - this.width));
+                this.y = Math.max(0, Math.min(this.y, gameHeight - this.height));
+                // ▲▲▲ 移動範囲を gameWidth/Height に合わせる ▲▲▲
+                if (this.shootCooldown > 0) this.shootCooldown -= 16.67;
+                if (this.missileCooldown > 0) this.missileCooldown -= 16.67;
+                if (this.laserDuration > 0) this.laserDuration -= 16.67; else laserActive = false;
+                if ((keys[' '] || keys['z']) && this.shootCooldown <= 0) { this.shoot(); }
+                if (activePowerUps.inquiry && this.missileCooldown <= 0) { this.fireMissile(); this.missileCooldown = 800; }
+                options.forEach((option, index) => { option.update(this.x, this.y, index); });
+            }
+            shoot() {
+                if (gameOver || gameWon) return;
+                this.shootCooldown = activePowerUps.learningBeam ? 50 : 200;
+                const projectileY = this.y + this.height / 2;
+                if (activePowerUps.learningBeam) {
+                    laserActive = true; this.laserDuration = 150; playSound('laser');
+                } else {
+                    projectiles.push(new Projectile(this.x + this.width, projectileY, 'player', 0, '💬', PROJECTILE_FONT_SIZE));
+                    playSound('shoot');
+                    if (activePowerUps.aiFeedback) {
+                        projectiles.push(new Projectile(this.x + this.width, projectileY - 10, 'player', Math.PI / 18, '💬', PROJECTILE_FONT_SIZE));
+                        projectiles.push(new Projectile(this.x + this.width, projectileY + 10, 'player', -Math.PI / 18, '💬', PROJECTILE_FONT_SIZE));
+                    }
+                }
+                options.forEach(option => option.shoot(activePowerUps.learningBeam));
+            }
+            fireMissile() {
+                if (gameOver || gameWon) return;
+                missiles.push(new Missile(this.x + this.width / 2, this.y + this.height, 'down'));
+                missiles.push(new Missile(this.x + this.width / 2, this.y, 'up'));
+                playSound('missile');
+            }
+            activatePowerUp() {
+                if (currentPowerUpIndex !== -1) {
+                    const selectedPowerUp = powerUpTypes[currentPowerUpIndex];
+                    playSound('powerupActivate');
+                    switch (selectedPowerUp) {
+                        case 'productivity': activePowerUps.productivity++; this.speed = PLAYER_SPEED_BASE + activePowerUps.productivity * 1; break;
+                        case 'inquiry': activePowerUps.inquiry = true; break;
+                        case 'aiFeedback': activePowerUps.aiFeedback = true; activePowerUps.learningBeam = false; break;
+                        case 'learningBeam': activePowerUps.learningBeam = true; activePowerUps.aiFeedback = false; break;
+                        case 'aiAgent': if (activePowerUps.aiAgent < 2) { activePowerUps.aiAgent++; options.push(new Option(options.length)); } break;
+                        case 'safety': activePowerUps.safety = true; shieldHp = 2; break;
+                    }
+                    updatePowerUpUI(); currentPowerUpIndex = -1; highlightPowerUp();
+                }
+            }
+            hit() {
+                if (this.invincible || gameWon) return;
+                playSound('playerHit');
+                if (activePowerUps.safety && shieldHp > 0) {
+                    shieldHp--; this.setInvincible(500);
+                    if (shieldHp <= 0) { activePowerUps.safety = false; const safetyElement = document.getElementById('safety'); if (safetyElement) safetyElement.classList.remove('active'); }
+                    updatePowerUpUI(); return;
+                }
+                lives--; updateLivesDisplay(); resetPowerUps();
+                if (lives <= 0) { gameOver = true; playSound('gameOver'); showGameOverMessage(); }
+                // ▼▼▼ 復活位置を gameHeight に合わせる ▼▼▼
+                else { this.x = 50; this.y = gameHeight / 2 - PLAYER_HEIGHT / 2; this.setInvincible(2000); }
+                // ▲▲▲ 復活位置を gameHeight に合わせる ▲▲▲
+            }
             setInvincible(duration) { this.invincible = true; this.invincibleTimer = duration; }
         }
 
-        // --- 弾オブジェクトクラス (変更なし) ---
-        class Projectile { /* ...変更なし... */
-             constructor(x, y, type, angle = 0, text = '?', fontSize = 16, speed = PROJECTILE_SPEED) { this.x = x; this.y = y; this.fontSize = fontSize; this.width = this.fontSize; this.height = this.fontSize; this.speed = speed; this.type = type; this.angle = angle; this.vx = Math.cos(angle) * this.speed; this.vy = Math.sin(angle) * this.speed; this.text = text; }
+        // --- 弾クラス (変更なし) ---
+        class Projectile {
+            constructor(x, y, type, angle = 0, text = '?', fontSize = 16, speed = PROJECTILE_SPEED) { this.x = x; this.y = y; this.fontSize = fontSize; this.width = this.fontSize; this.height = this.fontSize; this.speed = speed; this.type = type; this.angle = angle; this.vx = Math.cos(angle) * this.speed; this.vy = Math.sin(angle) * this.speed; this.text = text; }
             draw(ctx) { ctx.font = `${this.fontSize}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = this.type === 'player' ? '#ffffff' : '#ff5555'; ctx.fillText(this.text, this.x, this.y); }
             update() { this.x += this.vx; this.y += this.vy; }
         }
 
-        // --- ミサイルオブジェクトクラス (変更なし) ---
-        class Missile { /* ...変更なし... */
+        // --- ミサイルクラス (壁反射位置は gameHeight に依存) ---
+        class Missile {
             constructor(x, y, direction) { this.x = x; this.y = y; this.fontSize = MISSILE_FONT_SIZE; this.width = this.fontSize; this.height = this.fontSize; this.speed = MISSILE_SPEED; this.direction = direction; }
-            draw(ctx) { ctx.font = `bold ${this.fontSize}px "Press Start 2P"`; ctx.fillStyle = '#ff0000'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('？', this.x, this.y); }
-            update() { if (this.direction === 'down') { this.y += this.speed; if (this.y > gameHeight - this.height / 2 - 5) { this.y = gameHeight - this.height / 2 - 5; this.x += this.speed / 2; this.direction = 'ground'; } } else { this.y -= this.speed; if (this.y < this.height / 2 + 5) { this.y = this.height / 2 + 5; this.x += this.speed / 2; this.direction = 'ceiling'; } } if (this.direction === 'ground' || this.direction === 'ceiling') { this.x += this.speed / 1.5; } }
+            draw(ctx) { ctx.font = `bold ${this.fontSize}px "Press Start 2P"`; ctx.fillStyle = '#ffcc00'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('？', this.x, this.y); }
+            update() {
+                // ▼▼▼ 壁反射位置を gameHeight に合わせる ▼▼▼
+                if (this.direction === 'down') {
+                    this.y += this.speed;
+                    if (this.y > gameHeight - this.height / 2 - 5) { this.y = gameHeight - this.height / 2 - 5; this.x += this.speed / 2; this.direction = 'ground'; }
+                } else { // 'up'
+                    this.y -= this.speed;
+                    if (this.y < this.height / 2 + 5) { this.y = this.height / 2 + 5; this.x += this.speed / 2; this.direction = 'ceiling'; }
+                }
+                // ▲▲▲ 壁反射位置を gameHeight に合わせる ▲▲▲
+                if (this.direction === 'ground' || this.direction === 'ceiling') { this.x += this.speed / 1.5; }
+             }
         }
 
 
-        // --- 敵オブジェクトクラス (変更なし) ---
-        class Enemy { /* ...変更なし... */
-             constructor(y, typeName) { const type = enemyTypes[typeName] || enemyTypes.shortage; this.typeName = typeName; this.text = type.text; this.width = type.width; this.height = type.height; this.x = gameWidth; this.y = y; this.speed = (ENEMY_SPEED_BASE + Math.random() * 0.5) * type.speedMultiplier; this.color = type.color; this.health = type.health; this.value = type.value; this.moveType = type.moveType; this.amplitude = Math.random() * 40 + 10; this.frequency = Math.random() * 0.04 + 0.01; this.initialY = y; this.canDropPowerUp = Math.random() < type.dropChance; if (this.moveType === 'shooter') { this.shootCooldown = type.shootCooldown + (Math.random() * 500 - 250); this.lastShotTime = 0; } }
+        // --- 敵クラス (出現位置、移動範囲は gameWidth/Height に依存) ---
+        class Enemy {
+            constructor(y, typeName) {
+                const type = enemyTypes[typeName] || enemyTypes.shortage;
+                this.typeName = typeName; this.text = type.text; this.width = type.width; this.height = type.height;
+                // ▼▼▼ 出現X座標を gameWidth に合わせる ▼▼▼
+                this.x = gameWidth;
+                // ▲▲▲ 出現X座標を gameWidth に合わせる ▲▲▲
+                this.y = y; this.speed = (ENEMY_SPEED_BASE + Math.random() * 0.5) * type.speedMultiplier; this.color = type.color; this.health = type.health; this.value = type.value; this.moveType = type.moveType; this.amplitude = Math.random() * 40 + 10; this.frequency = Math.random() * 0.04 + 0.01; this.initialY = y; this.canDropPowerUp = Math.random() < type.dropChance; if (this.moveType === 'shooter') { this.shootCooldown = type.shootCooldown + (Math.random() * 500 - 250); this.lastShotTime = 0; }
+            }
             draw(ctx) { ctx.font = `bold ${ENEMY_FONT_SIZE}px "Press Start 2P"`; ctx.fillStyle = this.color; ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillText(this.text, this.x, this.y); }
-            update(timestamp) { this.x -= this.speed; if (this.moveType === 'sine') { this.y = this.initialY + Math.sin((gameWidth - this.x) * this.frequency) * this.amplitude; this.y = Math.max(0, Math.min(this.y, gameHeight - this.height)); } else if (this.moveType === 'shooter' && player) { if (this.x < gameWidth * 0.9 && this.x > 0 && timestamp - this.lastShotTime > this.shootCooldown) { this.shoot(); this.lastShotTime = timestamp; this.shootCooldown = enemyTypes[this.typeName].shootCooldown + (Math.random() * 500 - 250); } } }
+            update(timestamp) {
+                this.x -= this.speed;
+                if (this.moveType === 'sine') {
+                    // ▼▼▼ Y座標移動範囲を gameHeight に合わせる ▼▼▼
+                    this.y = this.initialY + Math.sin((gameWidth - this.x) * this.frequency) * this.amplitude;
+                    this.y = Math.max(0, Math.min(this.y, gameHeight - this.height));
+                    // ▲▲▲ Y座標移動範囲を gameHeight に合わせる ▲▲▲
+                } else if (this.moveType === 'shooter' && player) {
+                    // ▼▼▼ 射撃開始X座標を gameWidth に合わせる ▼▼▼
+                    if (this.x < gameWidth * 0.9 && this.x > 0 && timestamp - this.lastShotTime > this.shootCooldown) {
+                    // ▲▲▲ 射撃開始X座標を gameWidth に合わせる ▲▲▲
+                        this.shoot(); this.lastShotTime = timestamp; this.shootCooldown = enemyTypes[this.typeName].shootCooldown + (Math.random() * 500 - 250);
+                    }
+                }
+            }
             shoot() { if (!player || gameOver || gameWon) return; playSound('enemyShoot'); const targetX = player.x + player.width / 2; const targetY = player.y + player.height / 2; const dx = targetX - (this.x); const dy = targetY - (this.y + this.height / 2); const angle = Math.atan2(dy, dx); enemyProjectiles.push(new Projectile( this.x, this.y + this.height / 2, 'enemy', angle, '💣', ENEMY_PROJECTILE_FONT_SIZE, ENEMY_PROJECTILE_SPEED )); }
             hit() { this.health--; if (this.health <= 0) { addScore(this.value); playSound('enemyHit'); if (this.canDropPowerUp) { dropPowerUpItem(this.x + this.width / 2, this.y + this.height / 2); } return true; } const originalColor = this.color; this.color = '#ffffff'; setTimeout(() => { this.color = originalColor; }, 60); return false; }
         }
 
         // --- PowerUpItemクラス (変更なし) ---
-        class PowerUpItem { /* ...変更なし... */
+        class PowerUpItem {
             constructor(x, y) { this.x = x - POWERUP_ITEM_WIDTH / 2; this.y = y - POWERUP_ITEM_HEIGHT / 2; this.width = POWERUP_ITEM_WIDTH; this.height = POWERUP_ITEM_HEIGHT; this.speed = POWERUP_ITEM_SPEED; this.colorTop = '#aaaaee'; this.colorBody = '#4444ff'; this.colorAccent = '#ff4444'; this.sparkleOffset = 0; this.sparkleSpeed = 0.1; }
-            draw(ctx, timestamp) { const topHeight = this.height * 0.2; const bodyHeight = this.height * 0.6; const bottomHeight = this.height * 0.2; ctx.fillStyle = this.colorTop; ctx.fillRect(this.x, this.y, this.width, topHeight); ctx.fillStyle = this.colorBody; ctx.fillRect(this.x, this.y + topHeight, this.width, bodyHeight); ctx.fillStyle = this.colorTop; ctx.fillRect(this.x, this.y + topHeight + bodyHeight, this.width, bottomHeight); ctx.fillStyle = this.colorAccent; ctx.beginPath(); ctx.moveTo(this.x + this.width / 2, this.y + topHeight + bodyHeight * 0.2); ctx.lineTo(this.x + this.width * 0.8, this.y + this.height / 2); ctx.lineTo(this.x + this.width / 2, this.y + topHeight + bodyHeight * 0.8); ctx.lineTo(this.x + this.width * 0.2, this.y + this.height / 2); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#ffffff'; ctx.font = 'bold 8px "Press Start 2P"'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText("RB", this.x + this.width / 2, this.y + this.height / 2 + 1); ctx.fillStyle = '#ffffaa'; const sparkleSize = 2; const sparkleDistance = Math.max(this.width, this.height) * 0.7; const angle1 = timestamp * 0.005 + this.sparkleOffset; const angle2 = timestamp * 0.005 + Math.PI / 2 + this.sparkleOffset; const angle3 = timestamp * 0.005 + Math.PI + this.sparkleOffset; const angle4 = timestamp * 0.005 + Math.PI * 1.5 + this.sparkleOffset; const centerX = this.x + this.width / 2; const centerY = this.y + this.height / 2; ctx.fillRect(centerX + Math.cos(angle1) * sparkleDistance - sparkleSize / 2, centerY + Math.sin(angle1) * sparkleDistance - sparkleSize / 2, sparkleSize, sparkleSize); ctx.fillRect(centerX + Math.cos(angle2) * sparkleDistance - sparkleSize / 2, centerY + Math.sin(angle2) * sparkleDistance - sparkleSize / 2, sparkleSize, sparkleSize); ctx.fillRect(centerX + Math.cos(angle3) * sparkleDistance - sparkleSize / 2, centerY + Math.sin(angle3) * sparkleDistance - sparkleSize / 2, sparkleSize, sparkleSize); ctx.fillRect(centerX + Math.cos(angle4) * sparkleDistance - sparkleSize / 2, centerY + Math.sin(angle4) * sparkleDistance - sparkleSize / 2, sparkleSize, sparkleSize); }
+            draw(ctx, timestamp) { const topHeight = this.height * 0.2; const bodyHeight = this.height * 0.6; const bottomHeight = this.height * 0.2; ctx.fillStyle = this.colorTop; ctx.fillRect(this.x, this.y, this.width, topHeight); ctx.fillStyle = this.colorBody; ctx.fillRect(this.x, this.y + topHeight, this.width, bodyHeight); ctx.fillStyle = this.colorTop; ctx.fillRect(this.x, this.y + topHeight + bodyHeight, this.width, bottomHeight); ctx.fillStyle = this.colorAccent; ctx.beginPath(); ctx.moveTo(this.x + this.width / 2, this.y + topHeight + bodyHeight * 0.2); ctx.lineTo(this.x + this.width * 0.8, this.y + this.height / 2); ctx.lineTo(this.x + this.width / 2, this.y + topHeight + bodyHeight * 0.8); ctx.lineTo(this.x + this.width * 0.2, this.y + this.height / 2); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#ffffff'; ctx.font = 'bold 8px "Press Start 2P"'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText("P", this.x + this.width / 2, this.y + this.height / 2 + 1); ctx.fillStyle = '#ffffaa'; const sparkleSize = 2; const sparkleDistance = Math.max(this.width, this.height) * 0.7; const angle1 = timestamp * 0.005 + this.sparkleOffset; const angle2 = timestamp * 0.005 + Math.PI / 2 + this.sparkleOffset; const angle3 = timestamp * 0.005 + Math.PI + this.sparkleOffset; const angle4 = timestamp * 0.005 + Math.PI * 1.5 + this.sparkleOffset; const centerX = this.x + this.width / 2; const centerY = this.y + this.height / 2; ctx.fillRect(centerX + Math.cos(angle1) * sparkleDistance - sparkleSize / 2, centerY + Math.sin(angle1) * sparkleDistance - sparkleSize / 2, sparkleSize, sparkleSize); ctx.fillRect(centerX + Math.cos(angle2) * sparkleDistance - sparkleSize / 2, centerY + Math.sin(angle2) * sparkleDistance - sparkleSize / 2, sparkleSize, sparkleSize); ctx.fillRect(centerX + Math.cos(angle3) * sparkleDistance - sparkleSize / 2, centerY + Math.sin(angle3) * sparkleDistance - sparkleSize / 2, sparkleSize, sparkleSize); ctx.fillRect(centerX + Math.cos(angle4) * sparkleDistance - sparkleSize / 2, centerY + Math.sin(angle4) * sparkleDistance - sparkleSize / 2, sparkleSize, sparkleSize); }
             update() { this.x -= this.speed; }
         }
 
-        // --- Optionクラス (★ 定数変更適用) ---
+        // --- Optionクラス (プレイヤー座標に依存) ---
         class Option {
-            constructor() {
-                this.x = 0; this.y = 0;
-                this.width = OPTION_WIDTH; // ★ 定数使用
-                this.height = OPTION_HEIGHT; // ★ 定数使用
-                this.size = Math.max(this.width, this.height);
-                this.followDelay = 10; this.history = []; this.shootCooldown = 0;
+            constructor(index = 0) { this.x = 0; this.y = 0; this.width = OPTION_WIDTH; this.height = OPTION_HEIGHT; this.size = Math.max(this.width, this.height); this.shootCooldown = 0; this.angle = index * Math.PI; }
+            draw(ctx) { if (optionImageLoaded) { ctx.drawImage(optionImage, this.x, this.y, this.width, this.height); } else { ctx.fillStyle = '#00aaff'; ctx.beginPath(); ctx.arc(this.x + this.width / 2, this.y + this.height / 2, this.size / 2, 0, Math.PI * 2); ctx.fill(); } }
+            update(playerX, playerY, index) {
+                 this.angle += ORBIT_SPEED; if (this.angle > Math.PI * 2) { this.angle -= Math.PI * 2; }
+                 const playerCenterX = playerX + PLAYER_WIDTH / 2; const playerCenterY = playerY + PLAYER_HEIGHT / 2;
+                 const currentOrbitAngle = this.angle + index * Math.PI;
+                 const targetX = playerCenterX + Math.cos(currentOrbitAngle) * ORBIT_RADIUS - this.width / 2;
+                 const targetY = playerCenterY + Math.sin(currentOrbitAngle) * ORBIT_RADIUS - this.height / 2;
+                 this.x = targetX; this.y = targetY;
+                 if (this.shootCooldown > 0) this.shootCooldown -= 16.67;
             }
-            draw(ctx) { /* ...描画ロジック変更なし... */ if (optionImageLoaded) { ctx.drawImage(optionImage, this.x, this.y, this.width, this.height); } else { ctx.fillStyle = '#00aaff'; ctx.beginPath(); ctx.arc(this.x + this.width / 2, this.y + this.height / 2, this.size / 2, 0, Math.PI * 2); ctx.fill(); } }
-            update(playerX, playerY, index) { /* ...追従ロジック変更なし (OPTION_DISTANCE使用)... */ this.history.push({ x: playerX, y: playerY }); if (this.history.length > this.followDelay * (index + 1)) { this.history.shift(); } if (this.history.length > 0) { const targetPos = this.history[0]; this.x = targetPos.x; this.y = targetPos.y; } else { this.x = playerX - OPTION_DISTANCE * (index + 1); this.y = playerY; } this.x = Math.max(0, Math.min(this.x, gameWidth - this.width)); this.y = Math.max(0, Math.min(this.y, gameHeight - this.height)); if (this.shootCooldown > 0) this.shootCooldown -= 16.67; }
-             shoot(isLaser) { /* ...射撃ロジック変更なし... */ if (this.shootCooldown <= 0) { this.shootCooldown = 200; const projectileY = this.y + this.height / 2; const projectileX = this.x + this.width; if (isLaser) { projectiles.push(new Projectile(projectileX, projectileY, 'player', 0, '?', PROJECTILE_FONT_SIZE)); playSound('laser'); } else { projectiles.push(new Projectile(projectileX, projectileY, 'player', 0, '💬', PROJECTILE_FONT_SIZE)); playSound('shoot'); } } }
+            shoot(isLaser) { if (this.shootCooldown <= 0) { this.shootCooldown = 200; const projectileY = this.y + this.height / 2; const projectileX = this.x + this.width; if (isLaser) { projectiles.push(new Projectile(projectileX, projectileY, 'player', 0, '?', PROJECTILE_FONT_SIZE)); playSound('laser'); } else { projectiles.push(new Projectile(projectileX, projectileY, 'player', 0, '💬', PROJECTILE_FONT_SIZE)); playSound('shoot'); } } }
         }
 
-        // --- Starクラス (変更なし) ---
-        class Star { /* ...変更なし... */
-            constructor() { this.x = Math.random() * gameWidth; this.y = Math.random() * gameHeight; this.size = Math.random() * 1.5 + 0.5; this.speed = this.size * STAR_SPEED_FACTOR; }
+        // --- Starクラス (出現範囲、移動は gameWidth/Height に依存) ---
+        class Star {
+            constructor() {
+                // ▼▼▼ 出現範囲を gameWidth/Height に合わせる ▼▼▼
+                this.x = Math.random() * gameWidth;
+                this.y = Math.random() * gameHeight;
+                // ▲▲▲ 出現範囲を gameWidth/Height に合わせる ▲▲▲
+                this.size = Math.random() * 1.5 + 0.5; this.speed = this.size * STAR_SPEED_FACTOR;
+            }
             draw(ctx) { ctx.fillStyle = `rgba(255, 255, 255, ${this.size / 2})`; ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill(); }
-            update() { this.x -= this.speed; if (this.x < 0) { this.x = gameWidth; this.y = Math.random() * gameHeight; this.size = Math.random() * 1.5 + 0.5; this.speed = this.size * STAR_SPEED_FACTOR; } }
+            update() {
+                this.x -= this.speed;
+                // ▼▼▼ 再出現位置を gameWidth/Height に合わせる ▼▼▼
+                if (this.x < 0) { this.x = gameWidth; this.y = Math.random() * gameHeight; this.size = Math.random() * 1.5 + 0.5; this.speed = this.size * STAR_SPEED_FACTOR; }
+                // ▲▲▲ 再出現位置を gameWidth/Height に合わせる ▲▲▲
+            }
         }
 
-        // --- 地形（惑星）クラス (変更なし) ---
-        class Planet { /* ...変更なし... */
-            constructor(y, radius, color, speed) { this.x = gameWidth + radius; this.y = y; this.radius = radius; this.color = color; this.speed = speed; }
+        // --- 地形クラス (出現位置は gameWidth に依存) ---
+        class Planet {
+            constructor(y, radius, color, speed) {
+                // ▼▼▼ 出現X座標を gameWidth に合わせる ▼▼▼
+                this.x = gameWidth + radius;
+                // ▲▲▲ 出現X座標を gameWidth に合わせる ▲▲▲
+                this.y = y; this.radius = radius; this.color = color; this.speed = speed;
+             }
             draw(ctx) { ctx.fillStyle = this.color; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = 'rgba(0, 0, 0, 0.15)'; const numCraters = Math.floor(this.radius / 10); for (let i = 0; i < numCraters; i++) { const craterRadius = Math.random() * (this.radius * 0.15) + (this.radius * 0.05); const angle = Math.random() * Math.PI * 2; const dist = Math.random() * (this.radius - craterRadius); const craterX = this.x + Math.cos(angle) * dist; const craterY = this.y + Math.sin(angle) * dist; ctx.beginPath(); ctx.arc(craterX, craterY, craterRadius, 0, Math.PI * 2); ctx.fill(); } }
             update() { this.x -= this.speed; }
             checkCollisionWithRect(rect) { const closestX = Math.max(rect.x, Math.min(this.x, rect.x + rect.width)); const closestY = Math.max(rect.y, Math.min(this.y, rect.y + rect.height)); const distanceX = this.x - closestX; const distanceY = this.y - closestY; const distanceSquared = (distanceX * distanceX) + (distanceY * distanceY); return distanceSquared < (this.radius * this.radius); }
             checkCollisionWithPoint(point) { const distanceX = this.x - point.x; const distanceY = this.y - point.y; const distanceSquared = (distanceX * distanceX) + (distanceY * distanceY); return distanceSquared < (this.radius * this.radius); }
         }
 
-        // --- ★ ボスクラス ---
+        // --- ボスクラス (出現位置、移動範囲は gameWidth/Height に依存) ---
         class Boss {
             constructor() {
-                this.width = BOSS_WIDTH;
-                this.height = BOSS_HEIGHT;
-                this.x = gameWidth; // 画面右外から
-                this.y = gameHeight / 2 - this.height / 2; // 中央の高さ
-                this.speedX = 1.5; // 登場時の横移動速度
-                this.speedY = 1;   // 登場後の縦移動速度
-                this.maxHealth = BOSS_MAX_HEALTH;
-                this.health = this.maxHealth;
-                this.shootCooldown = BOSS_SHOOT_COOLDOWN;
-                this.lastShotTime = 0;
-                this.onScreen = false; // 画面内に完全に登場したか
-                this.targetY = this.y; // 縦移動の目標Y座標
-                this.hitFlashTimer = 0; // 被弾時のフラッシュタイマー
+                this.width = BOSS_WIDTH; this.height = BOSS_HEIGHT;
+                // ▼▼▼ 出現X,Y座標を gameWidth/Height に合わせる ▼▼▼
+                this.x = gameWidth;
+                this.y = gameHeight / 2 - this.height / 2;
+                // ▲▲▲ 出現X,Y座標を gameWidth/Height に合わせる ▲▲▲
+                this.speedX = 1.5; this.speedY = 1; this.maxHealth = BOSS_MAX_HEALTH; this.health = this.maxHealth; this.shootCooldown = BOSS_SHOOT_COOLDOWN; this.lastShotTime = 0; this.onScreen = false; this.targetY = this.y; this.hitFlashTimer = 0;
             }
-
             draw(ctx) {
-                let currentImage = bossImage;
-                // 被弾フラッシュ
-                if (this.hitFlashTimer > 0) {
-                    if (Math.floor(this.hitFlashTimer / 50) % 2 === 0) {
-                       ctx.globalAlpha = 0.5;
-                    }
-                }
-
-                if (bossImageLoaded) {
-                    ctx.drawImage(currentImage, this.x, this.y, this.width, this.height);
-                } else {
-                    // フォールバック
-                    ctx.fillStyle = '#880000'; // 暗い赤
-                    ctx.fillRect(this.x, this.y, this.width, this.height);
-                }
-                ctx.globalAlpha = 1.0; // 透明度を戻す
-
-                // HPバー更新 (ボス出現中のみ表示)
-                bossHpBar.style.display = 'block';
-                const hpPercentage = Math.max(0, this.health / this.maxHealth) * 100;
-                bossHpFill.style.width = `${hpPercentage}%`;
+                let currentImage = bossImage; if (this.hitFlashTimer > 0) { if (Math.floor(this.hitFlashTimer / 50) % 2 === 0) { ctx.globalAlpha = 0.5; } }
+                if (bossImageLoaded) { ctx.drawImage(currentImage, this.x, this.y, this.width, this.height); }
+                else { ctx.fillStyle = '#880000'; ctx.fillRect(this.x, this.y, this.width, this.height); }
+                ctx.globalAlpha = 1.0; bossHpBar.style.display = 'block'; const hpPercentage = Math.max(0, this.health / this.maxHealth) * 100; bossHpFill.style.width = `${hpPercentage}%`;
             }
-
             update(timestamp) {
-                // 被弾フラッシュタイマー減少
-                if (this.hitFlashTimer > 0) {
-                    this.hitFlashTimer -= 1000 / 60; // 1フレーム時間(ms)
-                }
-
-
+                if (this.hitFlashTimer > 0) { this.hitFlashTimer -= 1000 / 60; }
                 if (!this.onScreen) {
-                    // 画面内に移動
                     this.x -= this.speedX;
-                    if (this.x <= gameWidth - this.width - 50) { // 画面右端から少し内側へ
-                        this.x = gameWidth - this.width - 50;
-                        this.onScreen = true;
-                        this.lastShotTime = timestamp; // 画面に出てから射撃開始
-                    }
+                    // ▼▼▼ 画面内停止位置を gameWidth に合わせる ▼▼▼
+                    if (this.x <= gameWidth - this.width - 50) { this.x = gameWidth - this.width - 50; this.onScreen = true; this.lastShotTime = timestamp; }
+                    // ▲▲▲ 画面内停止位置を gameWidth に合わせる ▲▲▲
                 } else {
-                    // 画面内での上下移動
+                    // ▼▼▼ Y座標移動範囲を gameHeight に合わせる ▼▼▼
                     this.y += this.speedY;
-                    if (this.y <= 0 || this.y + this.height >= gameHeight) {
-                        this.speedY *= -1; // 端に当たったら反転
-                        this.y = Math.max(0, Math.min(this.y, gameHeight - this.height)); // 画面内に収める
-                    }
-
-                    // 射撃
-                    if (timestamp - this.lastShotTime > this.shootCooldown) {
-                        this.shoot();
-                        this.lastShotTime = timestamp;
-                    }
+                    if (this.y <= 0 || this.y + this.height >= gameHeight) { this.speedY *= -1; this.y = Math.max(0, Math.min(this.y, gameHeight - this.height)); }
+                    // ▲▲▲ Y座標移動範囲を gameHeight に合わせる ▲▲▲
+                    if (timestamp - this.lastShotTime > this.shootCooldown) { this.shoot(); this.lastShotTime = timestamp; }
                 }
             }
-
-            shoot() {
-                if (!player || gameOver || gameWon) return;
-                playSound('enemyShoot'); // 敵と同じ射撃音を使用
-                const shootX = this.x; // ボスの左端から
-                const shootY = this.y + this.height / 2; // ボスの中心高さから
-
-                const angleToPlayer = Math.atan2(player.y + player.height / 2 - shootY, player.x + player.width / 2 - shootX);
-                const spreadAngle = Math.PI / 9; // 放射状の角度 (3発で60度くらい)
-
-                // 3方向に発射
-                enemyProjectiles.push(new Projectile(shootX, shootY, 'enemy', angleToPlayer - spreadAngle, '💣', ENEMY_PROJECTILE_FONT_SIZE, ENEMY_PROJECTILE_SPEED));
-                enemyProjectiles.push(new Projectile(shootX, shootY, 'enemy', angleToPlayer, '💣', ENEMY_PROJECTILE_FONT_SIZE, ENEMY_PROJECTILE_SPEED));
-                enemyProjectiles.push(new Projectile(shootX, shootY, 'enemy', angleToPlayer + spreadAngle, '💣', ENEMY_PROJECTILE_FONT_SIZE, ENEMY_PROJECTILE_SPEED));
-            }
-
-            hit() {
-                if (this.health <= 0) return false; // すでに倒されている
-
-                this.health--;
-                playSound('bossHit');
-                this.hitFlashTimer = 150; // フラッシュ時間(ms)
-
-                if (this.health <= 0) {
-                    addScore(BOSS_SCORE);
-                    playSound('bossDefeat');
-                    bossHpBar.style.display = 'none'; // HPバーを隠す
-                    gameWon = true; // ★ ゲームクリア
-                    showGameWonMessage();
-                    // ★ 爆発エフェクトなどをここに追加可能
-                    return true; // 倒された
-                }
-                return false; // まだ生存
-            }
+            shoot() { if (!player || gameOver || gameWon) return; playSound('enemyShoot'); const shootX = this.x; const shootY = this.y + this.height / 2; const angleToPlayer = Math.atan2(player.y + player.height / 2 - shootY, player.x + player.width / 2 - shootX); const spreadAngle = Math.PI / 9; enemyProjectiles.push(new Projectile(shootX, shootY, 'enemy', angleToPlayer - spreadAngle, '💣', ENEMY_PROJECTILE_FONT_SIZE, ENEMY_PROJECTILE_SPEED)); enemyProjectiles.push(new Projectile(shootX, shootY, 'enemy', angleToPlayer, '💣', ENEMY_PROJECTILE_FONT_SIZE, ENEMY_PROJECTILE_SPEED)); enemyProjectiles.push(new Projectile(shootX, shootY, 'enemy', angleToPlayer + spreadAngle, '💣', ENEMY_PROJECTILE_FONT_SIZE, ENEMY_PROJECTILE_SPEED)); }
+            hit() { if (this.health <= 0) return false; this.health--; playSound('bossHit'); this.hitFlashTimer = 150; if (this.health <= 0) { addScore(BOSS_SCORE); playSound('bossDefeat'); bossHpBar.style.display = 'none'; gameWon = true; showGameWonMessage(); return true; } return false; }
         }
 
 
-        // --- 初期化 (★ ボス関連リセット追加) ---
+        // --- 初期化 ---
         function init() {
-            resizeCanvas(); player = new Player(50, gameHeight / 2 - PLAYER_HEIGHT / 2);
+            // ▼▼▼ resizeCanvas を最初に呼び出す ▼▼▼
+            resizeCanvas();
+            // ▲▲▲ resizeCanvas を最初に呼び出す ▲▲▲
+            player = new Player(50, gameHeight / 2 - PLAYER_HEIGHT / 2); // gameHeight を使う
             projectiles = []; enemyProjectiles = []; missiles = []; enemies = []; powerUpItemsList = []; options = []; terrain = [];
-            score = 0; lives = 3; gameOver = false; gameWon = false; // ★ gameWonリセット
+            score = 0; lives = 3; gameOver = false; gameWon = false;
             gameRunning = false; lastEnemySpawn = 0; lastPlanetSpawn = 0;
             keys = {}; currentPowerUpIndex = -1; resetPowerUps(false); shieldHp = 0; laserActive = false;
-            bossModeActive = false; // ★ bossModeリセット
-            boss = null; // ★ bossリセット
-            bossHpBar.style.display = 'none'; // ★ HPバー非表示
+            bossModeActive = false; boss = null; bossHpBar.style.display = 'none';
 
             updateScoreDisplay(); updateLivesDisplay(); updatePowerUpUI(); highlightPowerUp();
-            messageBox.style.display = 'none'; stars = []; for (let i = 0; i < STAR_COUNT; i++) { stars.push(new Star()); }
+            messageBox.style.display = 'none';
+            // ▼▼▼ 星の初期化も resizeCanvas 後に行う ▼▼▼
+            stars = [];
+            for (let i = 0; i < STAR_COUNT; i++) {
+                stars.push(new Star()); // Starのコンストラクタが gameWidth/Height を使う
+            }
+            // ▲▲▲ 星の初期化も resizeCanvas 後に行う ▲▲▲
             enemySpawnPool = []; Object.keys(enemyTypes).forEach(key => { const weight = (key === 'resistance') ? 1 : 2; for (let i = 0; i < weight; i++) { enemySpawnPool.push(key); } });
             showStartMessage(); const newRestartButton = restartButton.cloneNode(true); restartButton.parentNode.replaceChild(newRestartButton, restartButton); document.getElementById('restartButton').addEventListener('click', startGame);
-            window.removeEventListener('keydown', handleKeyDown); window.removeEventListener('keyup', handleKeyUp); window.removeEventListener('resize', resizeCanvas);
-            window.addEventListener('keydown', handleKeyDown); window.addEventListener('keyup', handleKeyUp); window.addEventListener('resize', resizeCanvas);
+            window.removeEventListener('keydown', handleKeyDown); window.removeEventListener('keyup', handleKeyUp); window.removeEventListener('resize', handleResize); // ★ リサイズハンドラを変更
+            window.addEventListener('keydown', handleKeyDown); window.addEventListener('keyup', handleKeyUp);
+            window.addEventListener('resize', handleResize); // ★ リサイズイベントに新しいハンドラを設定
+            window.addEventListener('orientationchange', handleResize); // ★ 画面回転イベントにも対応
         }
 
-        // --- メッセージ表示関数 (ゲームクリアメッセージ追加) ---
-        function showStartMessage() { /* ...変更なし... */ messageText.innerHTML = "リフレクこVS学習しない組織<br>Arrow Keys/WASD: Move<br>Space/Z: Shoot<br>Shift/X: Activate PowerUp<br><br>PRESS START BUTTON"; const startButton = document.getElementById('restartButton'); startButton.textContent = "START GAME"; messageBox.style.display = 'block'; gameRunning = false; }
-        function showGameOverMessage() { /* ...変更なし... */ messageText.innerHTML = `GAME OVER<br>FINAL SCORE: ${score}`; const restartBtn = document.getElementById('restartButton'); restartBtn.textContent = "RESTART"; messageBox.style.display = 'block'; gameRunning = false; }
-        function showGameWonMessage() { // ★ ゲームクリアメッセージ
-            messageText.innerHTML = `CONGRATULATIONS!<br>YOU WIN!<br>FINAL SCORE: ${score}`;
-            const restartBtn = document.getElementById('restartButton');
-            restartBtn.textContent = "PLAY AGAIN?";
-            messageBox.style.display = 'block';
-            gameRunning = false; // ゲームループ停止
-        }
+        // --- メッセージ表示関数 (変更なし) ---
+        function showStartMessage() { messageText.innerHTML = "AIコーチ VS 学習しない組織<br>Arrow Keys/WASD: Move<br>Space/Z: Shoot<br>Shift/X: Activate PowerUp<br><br>PRESS START BUTTON"; const startButton = document.getElementById('restartButton'); startButton.textContent = "START GAME"; messageBox.style.display = 'block'; gameRunning = false; }
+        function showGameOverMessage() { messageText.innerHTML = `GAME OVER<br>FINAL SCORE: ${score}`; const restartBtn = document.getElementById('restartButton'); restartBtn.textContent = "RESTART"; messageBox.style.display = 'block'; gameRunning = false; }
+        function showGameWonMessage() { messageText.innerHTML = `CONGRATULATIONS!<br>YOU WIN!<br>FINAL SCORE: ${score}`; const restartBtn = document.getElementById('restartButton'); restartBtn.textContent = "PLAY AGAIN?"; messageBox.style.display = 'block'; gameRunning = false; }
 
         // --- ゲーム開始関数 (変更なし) ---
-        function startGame() { /* ...変更なし... */ if (Tone.context.state !== 'running') { Tone.start().catch(e => console.error("Tone.start failed:", e)); } messageBox.style.display = 'none'; if (gameOver || gameWon) { init(); } gameOver = false; gameWon = false; gameRunning = true; requestAnimationFrame(gameLoop); }
+        function startGame() { if (Tone.context.state !== 'running') { Tone.start().catch(e => console.error("Tone.start failed:", e)); } messageBox.style.display = 'none'; if (gameOver || gameWon) { init(); } gameOver = false; gameWon = false; gameRunning = true; requestAnimationFrame(gameLoop); }
 
-        // --- リサイズ処理 (★ パワーアップバーの幅調整もここで行う) ---
+        // --- リサイズ処理 ---
+        // ▼▼▼ リサイズ処理を更新 ▼▼▼
         function resizeCanvas() {
-            gameWidth = gameContainer.clientWidth;
-            gameHeight = gameContainer.clientHeight;
-            canvas.width = gameWidth;
-            canvas.height = gameHeight;
-            stars.forEach(star => { star.x = Math.min(star.x, gameWidth); star.y = Math.min(star.y, gameHeight); });
-            // ★ パワーアップバーの幅も動的に調整
-            powerUpBar.style.width = `${gameWidth - 4}px`;
+            // gameContainer の実際の表示サイズを取得
+            const containerWidth = gameContainer.clientWidth;
+            const containerHeight = gameContainer.clientHeight;
+
+            // キャンバスの解像度（内部的な描画サイズ）を設定
+            // ここではコンテナの表示サイズに合わせる
+            canvas.width = containerWidth;
+            canvas.height = containerHeight;
+
+            // ゲーム内で使用する幅と高さを更新
+            gameWidth = canvas.width;
+            gameHeight = canvas.height;
+
+            // パワーアップバーの幅をコンテナに合わせる
+            powerUpBar.style.width = `${containerWidth}px`;
+            // 最大幅も設定しておく
+            powerUpBar.style.maxWidth = '960px';
+
+            // 星の位置を再計算（画面外に出ないように）
+            stars.forEach(star => {
+                star.x = Math.min(star.x, gameWidth);
+                star.y = Math.min(star.y, gameHeight);
+            });
+
+            console.log(`Resized canvas to: ${gameWidth}x${gameHeight}`);
         }
+
+        // リサイズイベントのハンドラ（少し遅延させて実行）
+        let resizeTimeout;
+        function handleResize() {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                resizeCanvas();
+                // 必要であればプレイヤー位置などを再調整
+                if (player) {
+                     player.x = Math.min(player.x, gameWidth - player.width);
+                     player.y = Math.min(player.y, gameHeight - player.height);
+                }
+            }, 100); // 100ms の遅延
+        }
+        // ▲▲▲ リサイズ処理を更新 ▲▲▲
 
         // --- パワーアップ処理 (変更なし) ---
-        function collectPowerUp() { /* ...変更なし... */ playSound('powerupCollect'); currentPowerUpIndex = (currentPowerUpIndex + 1) % powerUpTypes.length; highlightPowerUp(); }
-        function highlightPowerUp() { /* ...変更なし... */ powerUpItems.forEach((item, index) => { item.classList.toggle('highlighted', index === currentPowerUpIndex); }); }
-        function updatePowerUpUI() { /* ...変更なし... */ powerUpTypes.forEach((type, index) => { const element = document.getElementById(type); if (element) { let isActive = false; let text = element.textContent.split(' (')[0]; switch(type) { case 'speed': isActive = activePowerUps.speed > 0; if (isActive) text += ` (${activePowerUps.speed})`; break; case 'option': isActive = activePowerUps.option > 0; if (isActive) text += ` (${activePowerUps.option})`; break; case 'shield': isActive = activePowerUps.shield; text = isActive ? `SHIELD (${shieldHp})` : '? (SHIELD)'; break; default: isActive = activePowerUps[type]; break; } element.classList.toggle('active', isActive); element.textContent = text; } }); }
-        function resetPowerUps(updateUI = true) { /* ...変更なし... */ activePowerUps = { speed: 0, missile: false, double: false, laser: false, option: 0, shield: false }; if (player) player.speed = PLAYER_SPEED_BASE; options = []; shieldHp = 0; laserActive = false; currentPowerUpIndex = -1; if(updateUI) { updatePowerUpUI(); highlightPowerUp(); } }
-        function dropPowerUpItem(x, y) { /* ...変更なし... */ powerUpItemsList.push(new PowerUpItem(x, y)); }
+        function collectPowerUp() { playSound('powerupCollect'); currentPowerUpIndex = (currentPowerUpIndex + 1) % powerUpTypes.length; highlightPowerUp(); }
+        function highlightPowerUp() { powerUpItems.forEach((item, index) => { item.classList.toggle('highlighted', index === currentPowerUpIndex); }); }
+        function updatePowerUpUI() {
+            powerUpTypes.forEach((type) => {
+                const element = document.getElementById(type);
+                if (element) {
+                    let isActive = false;
+                    let text = element.textContent.split(' (')[0];
+                    switch(type) {
+                        case 'productivity': isActive = activePowerUps.productivity > 0; text = isActive ? `生産性UP (${activePowerUps.productivity})` : '生産性UP'; break;
+                        case 'aiAgent': isActive = activePowerUps.aiAgent > 0; text = isActive ? `AIエージェント (${activePowerUps.aiAgent})` : 'AIエージェント'; break;
+                        case 'safety': isActive = activePowerUps.safety; text = isActive ? `心理的安全性 (${shieldHp})` : '心理的安全性'; break;
+                        case 'inquiry': isActive = activePowerUps.inquiry; text = '問いかけ'; break;
+                        case 'aiFeedback': isActive = activePowerUps.aiFeedback; text = 'AIフィードバック'; break;
+                        case 'learningBeam': isActive = activePowerUps.learningBeam; text = '経験学習ビーム'; break;
+                    }
+                    element.classList.toggle('active', isActive); element.textContent = text;
+                }
+            });
+        }
+        function resetPowerUps(updateUI = true) {
+            activePowerUps = { productivity: 0, inquiry: false, aiFeedback: false, learningBeam: false, aiAgent: 0, safety: false };
+            if (player) player.speed = PLAYER_SPEED_BASE;
+            options = []; shieldHp = 0; laserActive = false; currentPowerUpIndex = -1;
+            if(updateUI) { updatePowerUpUI(); highlightPowerUp(); }
+        }
+        function dropPowerUpItem(x, y) { powerUpItemsList.push(new PowerUpItem(x, y)); }
 
-        // --- スコア・ライフ更新 (★ ボスモードトリガー追加) ---
+        // --- スコア・ライフ更新 (変更なし) ---
         function addScore(amount) {
-            if (gameOver || gameWon) return; // ゲーム終了後はスコア加算しない
-            score += amount;
-            updateScoreDisplay();
-
-            // ★ ボスモードトリガー
+            if (gameOver || gameWon) return; score += amount; updateScoreDisplay();
             if (!bossModeActive && score >= BOSS_TRIGGER_SCORE) {
-                bossModeActive = true;
-                // 既存の敵・地形・敵弾をクリア
-                enemies = [];
-                terrain = [];
-                enemyProjectiles = [];
-                powerUpItemsList = []; // パワーアップアイテムも消す
-                // ボス生成
-                boss = new Boss();
-                console.log("BOSS MODE ACTIVATED!");
-                // TODO: "WARNING"メッセージ表示など？
+                bossModeActive = true; enemies = []; terrain = []; enemyProjectiles = []; powerUpItemsList = [];
+                boss = new Boss(); console.log("BOSS MODE ACTIVATED!");
             }
         }
-        function updateScoreDisplay() { /* ...変更なし... */ scoreDisplay.textContent = `SCORE: ${score}`; }
-        function updateLivesDisplay() { /* ...変更なし... */ livesDisplay.innerHTML = `LIVES: ${'💖'.repeat(lives)}`; }
+        function updateScoreDisplay() { scoreDisplay.textContent = `SCORE: ${score}`; }
+        function updateLivesDisplay() { livesDisplay.innerHTML = `LIVES: ${'💖'.repeat(lives)}`; }
 
-        // --- 衝突判定 (★ ボス関連追加) ---
+        // --- 衝突判定 (判定ロジックは gameWidth/Height に依存) ---
         function checkCollisions() {
-            if (!player) return; // プレイヤーがいない場合は判定しない
+            if (!player) return;
 
-            // 地形との衝突判定
+            // 地形との衝突
             terrain.forEach(planet => {
                 if (!player.invincible && planet.checkCollisionWithRect(player)) { player.hit(); }
                 projectiles = projectiles.filter(proj => !(proj.type === 'player' && planet.checkCollisionWithPoint(proj)));
@@ -414,84 +645,67 @@
             projectiles = projectiles.filter(proj => {
                 if (proj.type !== 'player') return true;
                 const projHitbox = { x: proj.x - proj.width / 2, y: proj.y - proj.height / 2, width: proj.width, height: proj.height };
-                // 通常敵
                 for (let i = enemies.length - 1; i >= 0; i--) {
                     const enemy = enemies[i];
-                    if (isColliding(projHitbox, enemy)) {
-                        if (enemy.hit()) { enemies.splice(i, 1); }
-                        return false; // 弾消滅
-                    }
+                    if (isColliding(projHitbox, enemy)) { if (enemy.hit()) { enemies.splice(i, 1); } return false; }
                 }
-                // ボス
-                if (boss && boss.onScreen && isColliding(projHitbox, boss)) {
-                     if (boss.hit()) { boss = null; } // ボスオブジェクト削除
-                     return false; // 弾消滅
-                }
-                return proj.x < gameWidth + proj.width; // 画面外判定
+                if (boss && boss.onScreen && isColliding(projHitbox, boss)) { if (boss.hit()) { boss = null; } return false; }
+                // ▼▼▼ 画面外判定を gameWidth に合わせる ▼▼▼
+                return proj.x < gameWidth + proj.width;
+                // ▲▲▲ 画面外判定を gameWidth に合わせる ▲▲▲
             });
 
             // 敵弾 vs プレイヤー
             enemyProjectiles = enemyProjectiles.filter(proj => {
                  const projHitbox = { x: proj.x - proj.width / 2, y: proj.y - proj.height / 2, width: proj.width, height: proj.height };
-                 if (!player.invincible && isColliding(projHitbox, player)) {
-                    player.hit();
-                    return false;
-                }
-                return proj.x > -proj.width && proj.x < gameWidth + proj.width && proj.y > -proj.height && proj.y < gameHeight + proj.height;
+                 if (!player.invincible && isColliding(projHitbox, player)) { player.hit(); return false; }
+                 // ▼▼▼ 画面外判定を gameWidth/Height に合わせる ▼▼▼
+                 return proj.x > -proj.width && proj.x < gameWidth + proj.width && proj.y > -proj.height && proj.y < gameHeight + proj.height;
+                 // ▲▲▲ 画面外判定を gameWidth/Height に合わせる ▲▲▲
             });
 
             // プレイヤーミサイル vs 敵/ボス
              missiles = missiles.filter(missile => {
                  const missileHitbox = { x: missile.x - missile.width / 2, y: missile.y - missile.height / 2, width: missile.width, height: missile.height };
-                 // 通常敵
                  for (let i = enemies.length - 1; i >= 0; i--) {
                      const enemy = enemies[i];
-                     if (isColliding(missileHitbox, enemy)) {
-                         if (enemy.hit()) { enemies.splice(i, 1); }
-                         return false;
-                     }
+                     if (isColliding(missileHitbox, enemy)) { if (enemy.hit()) { enemies.splice(i, 1); } return false; }
                  }
-                 // ボス
-                 if (boss && boss.onScreen && isColliding(missileHitbox, boss)) {
-                     if (boss.hit()) { boss = null; }
-                     return false;
-                 }
+                 if (boss && boss.onScreen && isColliding(missileHitbox, boss)) { if (boss.hit()) { boss = null; } return false; }
+                 // ▼▼▼ 画面外判定を gameWidth/Height に合わせる ▼▼▼
                  return missile.x < gameWidth + 50 && missile.x > -missile.width && missile.y < gameHeight + 50 && missile.y > -missile.height;
+                 // ▲▲▲ 画面外判定を gameWidth/Height に合わせる ▲▲▲
              });
 
             // プレイヤー vs 敵/ボス
             if (!player.invincible) {
-                // 通常敵
                 enemies.forEach((enemy, index) => { if (isColliding(player, enemy)) { player.hit(); if (enemy.hit()) { enemies.splice(index, 1); } } });
-                // ボス
-                if (boss && boss.onScreen && isColliding(player, boss)) {
-                    player.hit(); // ボスに接触しても即死
-                }
+                if (boss && boss.onScreen && isColliding(player, boss)) { player.hit(); }
             }
 
              // プレイヤー vs パワーアップアイテム
              powerUpItemsList = powerUpItemsList.filter(item => { if (isColliding(player, item)) { collectPowerUp(); return false; } return item.x > -item.width; });
 
-             // レーザー vs 敵/ボス (レーザー描画時に判定)
+             // レーザー vs 敵/ボス (判定ロジックは変更なし、描画座標に依存)
         }
-        function isColliding(rect1, rect2) { /* ...変更なし... */ return rect1.x < rect2.x + rect2.width && rect1.x + rect1.width > rect2.x && rect1.y < rect2.y + rect2.height && rect1.y + rect1.height > rect2.y; }
+        function isColliding(rect1, rect2) { return rect1.x < rect2.x + rect2.width && rect1.x + rect1.width > rect2.x && rect1.y < rect2.y + rect2.height && rect1.y + rect1.height > rect2.y; }
 
         // --- キーボード入力 (変更なし) ---
-        function handleKeyDown(e) { /* ...変更なし... */ if (!gameRunning && messageBox.style.display === 'block') { if (e.key === 'Shift' || e.key.toLowerCase() === 'x') { e.preventDefault(); return; } if (e.key === ' ' || e.key.toLowerCase() === 'z') { e.preventDefault(); return; } } else if (gameRunning) { keys[e.key] = true; if ((e.key === 'Shift' || e.key.toLowerCase() === 'x') && !e.repeat) { player.activatePowerUp(); } if (e.key === ' ' || e.key.toLowerCase() === 'z') { keys[e.key] = true; } } if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'Shift', 'z', 'x', 'w', 'a', 's', 'd'].includes(e.key)) { e.preventDefault(); } }
-        function handleKeyUp(e) { /* ...変更なし... */ keys[e.key] = false; }
+        function handleKeyDown(e) { if (!gameRunning && messageBox.style.display === 'block') { if (e.key === 'Shift' || e.key.toLowerCase() === 'x') { e.preventDefault(); return; } if (e.key === ' ' || e.key.toLowerCase() === 'z') { e.preventDefault(); return; } } else if (gameRunning) { keys[e.key] = true; if ((e.key === 'Shift' || e.key.toLowerCase() === 'x') && !e.repeat) { player.activatePowerUp(); } if (e.key === ' ' || e.key.toLowerCase() === 'z') { keys[e.key] = true; } } if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'Shift', 'z', 'x', 'w', 'a', 's', 'd'].includes(e.key)) { e.preventDefault(); } }
+        function handleKeyUp(e) { keys[e.key] = false; }
 
-        // --- ゲームループ (★ ボス処理、スポーン制御追加) ---
+        // --- ゲームループ (描画/更新は gameWidth/Height に依存) ---
         function gameLoop(timestamp) {
-            if (gameOver || gameWon || !gameRunning) { // ★ gameWonでも停止
-                return;
-            }
+            if (gameOver || gameWon || !gameRunning) { return; }
 
-            // スポーン処理 (★ ボスモード中は停止)
+            // スポーン処理 (ボスモード中は停止)
             if (!bossModeActive) {
-                // 敵
+                // ▼▼▼ 敵の出現Y座標を gameHeight に合わせる ▼▼▼
                 if (timestamp - lastEnemySpawn > ENEMY_SPAWN_RATE) { lastEnemySpawn = timestamp; if (enemySpawnPool.length > 0) { const randomPoolIndex = Math.floor(Math.random() * enemySpawnPool.length); const randomTypeKey = enemySpawnPool[randomPoolIndex]; const enemyType = enemyTypes[randomTypeKey]; const enemyY = Math.random() * (gameHeight - enemyType.height); enemies.push(new Enemy(enemyY, randomTypeKey)); } }
-                // 地形
+                // ▲▲▲ 敵の出現Y座標を gameHeight に合わせる ▲▲▲
+                // ▼▼▼ 地形の出現Y座標を gameHeight に合わせる ▼▼▼
                 if (timestamp - lastPlanetSpawn > PLANET_SPAWN_RATE) { lastPlanetSpawn = timestamp; const radius = Math.random() * 50 + 40; const y = Math.random() * (gameHeight - radius * 2) + radius; const color = `hsl(${Math.random() * 60 + 180}, 50%, ${Math.random() * 30 + 40}%)`; const speed = PLANET_SPEED * (Math.random() * 0.5 + 0.75); terrain.push(new Planet(y, radius, color, speed)); }
+                // ▲▲▲ 地形の出現Y座標を gameHeight に合わせる ▲▲▲
             }
 
             // 更新処理
@@ -502,16 +716,19 @@
             enemies.forEach(e => e.update(timestamp));
             powerUpItemsList.forEach(p => p.update());
             stars.forEach(s => s.update());
-            terrain = terrain.filter(t => t.x > -t.radius * 2); // 画面左端で消す
+            terrain = terrain.filter(t => t.x > -t.radius * 2);
             terrain.forEach(t => t.update());
-            options.forEach(o => o.update(player?.x ?? 0, player?.y ?? 0, options.indexOf(o)));
-            if (boss) boss.update(timestamp); // ★ ボスの更新
+            if (boss) boss.update(timestamp);
 
             // 衝突判定
             checkCollisions();
 
             // 描画処理
-            ctx.clearRect(0, 0, gameWidth, gameHeight); ctx.fillStyle = '#111'; ctx.fillRect(0, 0, gameWidth, gameHeight);
+            // ▼▼▼ 描画範囲を gameWidth/Height に合わせる ▼▼▼
+            ctx.clearRect(0, 0, gameWidth, gameHeight);
+            ctx.fillStyle = '#111';
+            ctx.fillRect(0, 0, gameWidth, gameHeight);
+            // ▲▲▲ 描画範囲を gameWidth/Height に合わせる ▲▲▲
             stars.forEach(s => s.draw(ctx));
             terrain.forEach(t => t.draw(ctx));
 
@@ -522,20 +739,16 @@
             missiles.forEach(m => m.draw(ctx));
             enemies.forEach(e => e.draw(ctx));
             powerUpItemsList.forEach(p => p.draw(ctx, timestamp));
-            if (boss) boss.draw(ctx); // ★ ボスの描画
+            if (boss) boss.draw(ctx);
 
-            // レーザー描画と衝突判定 (★ ボスとの衝突判定追加)
+            // レーザー描画と衝突判定 (変更なし)
              if (laserActive && player) {
                  ctx.font = `bold ${LASER_FONT_SIZE}px sans-serif`; ctx.fillStyle = '#00aaff'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
                  const textMetrics = ctx.measureText(LASER_TEXT); const laserWidth = textMetrics.width; const laserHeight = LASER_FONT_SIZE;
-
-                 // 本体レーザー処理
                  const laserStartX = player.x + player.width; const laserStartY = player.y + player.height / 2; ctx.fillText(LASER_TEXT, laserStartX, laserStartY); const laserRect = { x: laserStartX, y: laserStartY - laserHeight / 2, width: laserWidth, height: laserHeight };
                  for (let i = enemies.length - 1; i >= 0; i--) { const enemy = enemies[i]; if (isColliding(laserRect, enemy)) { if (enemy.hit()) { enemies.splice(i, 1); } } }
-                 if (boss && boss.onScreen && isColliding(laserRect, boss)) { if (boss.hit()) { boss = null; } } // ★ vs ボス
+                 if (boss && boss.onScreen && isColliding(laserRect, boss)) { if (boss.hit()) { boss = null; } }
                  terrain.forEach(planet => { if (planet.checkCollisionWithRect(laserRect)) { /* 衝突処理 */ } });
-
-                 // オプションレーザー処理
                  options.forEach(option => { const optionLaserStartX = option.x + option.width; const optionLaserStartY = option.y + option.height / 2; ctx.fillText(LASER_TEXT, optionLaserStartX, optionLaserStartY); const optionLaserRect = { x: optionLaserStartX, y: optionLaserStartY - laserHeight / 2, width: laserWidth, height: laserHeight }; for (let i = enemies.length - 1; i >= 0; i--) { const enemy = enemies[i]; if (isColliding(optionLaserRect, enemy)) { if (enemy.hit()) { enemies.splice(i, 1); } } } if (boss && boss.onScreen && isColliding(optionLaserRect, boss)) { if (boss.hit()) { boss = null; } } terrain.forEach(planet => { if (planet.checkCollisionWithRect(optionLaserRect)) { /* 衝突処理 */ } }); });
              }
 
@@ -545,9 +758,8 @@
         }
 
         // --- ゲーム開始 ---
-        init();
+        init(); // 初期化処理を実行
 
     </script>
 </body>
 </html>
-
